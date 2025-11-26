@@ -15,6 +15,13 @@ scalar Amount_Currency
 scalar Amount_Crypto
 scalar Amount
 scalar Upload
+type CryptoTransactionAnalyticsState {
+  transactions: [Transaction!]!
+  analytics: Analytics
+  metadata: TransactionMetadata
+  settings: Settings!
+}
+
 type TokenValue {
   amount: Float!
   token: String!
@@ -68,6 +75,7 @@ type ExchangeRate {
   timestamp: DateTime!
 }
 
+
 type Settings {
   baseCurrency: Currency!
   lastForexUpdate: DateTime
@@ -81,11 +89,20 @@ type Analytics {
   monthlyBreakdown: [TokenValue!]!
 }
 
-type CryptoTransactionAnalyticsState {
-  transactions: [Transaction!]!
-  analytics: Analytics
-  metadata: TransactionMetadata
-  settings: Settings!
+input TokenValueInput {
+  amount: Float!
+  token: String!
+  usdValue: Float
+}
+
+input PriceInfoInput {
+  amount: Float!
+  currency: Currency!
+}
+
+enum TransactionStatusInput {
+  SUCCESS
+  FAILED
 }
 
 
@@ -112,7 +129,7 @@ input AddTransactionInput {
   historicalPrice: PriceInfoInput
   currentValue: PriceInfoInput
   convertedValue: PriceInfoInput
-  status: TransactionStatus!
+  status: TransactionStatusInput!
   errorCode: String
   method: String
 }
@@ -127,6 +144,12 @@ input PriceInfoInput {
   amount: Float!
   currency: Currency!
 }
+
+enum TransactionStatusInput {
+  SUCCESS
+  FAILED
+}
+
 
 input UpdateTransactionInput {
   id: OID!

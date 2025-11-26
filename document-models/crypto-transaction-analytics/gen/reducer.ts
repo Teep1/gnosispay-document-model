@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import type { StateReducer } from "document-model";
 import { isDocumentAction, createReducer } from "document-model/core";
-import type { CryptoTransactionAnalyticsPHState } from "ba-workshop/document-models/crypto-transaction-analytics";
+import type { CryptoTransactionAnalyticsPHState } from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 
 import { cryptoTransactionAnalyticsTransactionManagementOperations } from "../src/reducers/transaction-management.js";
 import { cryptoTransactionAnalyticsCurrencyManagementOperations } from "../src/reducers/currency-management.js";

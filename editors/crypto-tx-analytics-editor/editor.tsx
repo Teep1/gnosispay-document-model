@@ -1,3 +1,11 @@
+import { useMemo, useState } from "react";
+import { EditCryptoTransactionAnalyticsName } from "./components/EditName.js";
+import { CsvUploader } from "./components/CsvUploader.js";
+import type { ParsedTransaction } from "./components/CsvUploader.js";
+import { ErrorBoundary } from "./components/ErrorBoundary.js";
+import { useSelectedCryptoTransactionAnalyticsDocument } from "../../document-models/crypto-transaction-analytics/index.js";
+import { DocumentToolbar } from "@powerhousedao/design-system/connect";
+
 interface SortableHeaderProps {
   label: string;
   onClick: () => void;
@@ -25,18 +33,11 @@ function SortableHeader({
     </th>
   );
 }
-import { useMemo, useState } from "react";
-import { EditCryptoTransactionAnalyticsName } from "./components/EditName.js";
-import { CsvUploader } from "./components/CsvUploader.js";
-import type { ParsedTransaction } from "./components/CsvUploader.js";
-import { ErrorBoundary } from "./components/ErrorBoundary.js";
-import { useSelectedCryptoTransactionAnalyticsDocument } from "ba-workshop/document-models/crypto-transaction-analytics";
-
 const TRACKED_ADDRESS =
-  import.meta.env.VITE_TRACKED_ETH_ADDRESS?.toLowerCase() ||
+  // import.meta.env.VITE_TRACKED_ETH_ADDRESS?.toLowerCase() ||
   "0x0000000000000000000000000000000000000000";
 const EXCLUDED_CONTRACT =
-  import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
+  // import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
   "0x0000000000000000000000000000000000000000";
 
 interface DocumentTransaction {
@@ -56,6 +57,7 @@ interface DocumentTransaction {
 export default function Editor() {
   return (
     <ErrorBoundary>
+      <DocumentToolbar />
       <EditorContent />
     </ErrorBoundary>
   );
@@ -65,7 +67,7 @@ type SortDirection = "asc" | "desc";
 type SortField = "timestamp" | "amount" | "token";
 
 function EditorContent() {
-  const [document] = useSelectedCryptoTransactionAnalyticsDocument();
+  const [document, dispatch] = useSelectedCryptoTransactionAnalyticsDocument();
   const [uploadSuccess, setUploadSuccess] = useState<{
     transactionCount: number;
     documentId: string;
@@ -85,107 +87,131 @@ function EditorContent() {
     console.log("Document ID:", document.header?.id);
     console.log("Document state:", document.state);
     console.log("Transactions:", document.state?.global?.transactions);
+    // Debug: Check first transaction's data
+    const firstTx = document.state?.global?.transactions?.[0];
+    if (firstTx) {
+      console.log("First transaction FULL:", firstTx);
+      console.log("First transaction fromAddress:", firstTx.fromAddress);
+      console.log("First transaction toAddress:", firstTx.toAddress);
+      console.log("First transaction valueIn:", firstTx.valueIn);
+      console.log("First transaction valueOut:", firstTx.valueOut);
+      console.log("First transaction txnFee:", firstTx.txnFee);
+      console.log(
+        "First transaction contractAddress:",
+        firstTx.contractAddress,
+      );
+    }
   }
 
-  const previewRows = useMemo(
-    () => filterPreviewTransactions(previewTransactions ?? []),
-    [previewTransactions],
-  );
-  const documentRows = useMemo(
+  // Convert document transactions to ParsedTransaction format for consistent display
+  const documentTransactionsAsParsed = useMemo((): ParsedTransaction[] => {
+    const docTxs = (document?.state?.global?.transactions ??
+      []) as DocumentTransaction[];
+    return docTxs.map((tx) => ({
+      transactionHash: tx.txHash,
+      timestamp: tx.timestamp,
+      rawTimestamp: tx.timestamp,
+      contractAddress: tx.contractAddress || "",
+      fromAddress: tx.fromAddress || "",
+      toAddress: tx.toAddress || "",
+      amountIn: tx.valueIn?.amount ?? null,
+      rawAmountIn: tx.valueIn?.amount?.toString() ?? "",
+      amountOut: tx.valueOut?.amount ?? null,
+      rawAmountOut: tx.valueOut?.amount?.toString() ?? "",
+      token:
+        tx.valueOut?.token ||
+        tx.valueIn?.token ||
+        tx.contractAddress ||
+        "Unknown",
+      feeAmount: tx.txnFee?.amount ?? null,
+      rawFee: tx.txnFee?.amount?.toString() ?? "",
+      feeToken: tx.txnFee?.token || "USD",
+      status: tx.status || "UNKNOWN",
+    }));
+  }, [document?.state?.global?.transactions]);
+
+  // Use previewTransactions if available (fresh upload), otherwise use converted document transactions
+  const effectivePreviewRows = useMemo(
     () =>
-      filterDocumentTransactions(
-        ((document?.state?.global?.transactions ??
-          []) as DocumentTransaction[]) || [],
+      filterPreviewTransactions(
+        previewTransactions ?? documentTransactionsAsParsed,
       ),
-    [document?.state?.global?.transactions],
+    [previewTransactions, documentTransactionsAsParsed],
   );
+
+  const previewRows = effectivePreviewRows;
+
+  // Check if we have existing transactions in the document state
+  const hasExistingTransactions = previewRows.length > 0;
 
   const trackedAddress =
-    useMemo(
-      () => deriveTrackedAddress(previewRows, documentRows),
-      [previewRows, documentRows],
-    ) || TRACKED_ADDRESS;
+    useMemo(() => deriveTrackedAddress(previewRows, []), [previewRows]) ||
+    TRACKED_ADDRESS;
 
-  const isPreview = previewRows.length > 0;
+  // Debug tracked address
+  console.log("DEBUG - trackedAddress:", trackedAddress);
+  console.log("DEBUG - previewRows count:", previewRows.length);
+  console.log("DEBUG - hasExistingTransactions:", hasExistingTransactions);
 
+  // Show data view if we have uploadSuccess OR existing transactions in document
+  const shouldShowDataView = uploadSuccess || hasExistingTransactions;
+
+  // Always use preview analytics since we convert all transactions to ParsedTransaction format
   const tokenAnalytics = useMemo(() => {
-    if (!uploadSuccess) {
+    if (!shouldShowDataView) {
+      console.log("DEBUG - tokenAnalytics: shouldShowDataView is false");
       return [];
     }
-    return isPreview
-      ? buildPreviewAnalytics(previewRows, trackedAddress)
-      : buildDocumentAnalytics(documentRows, trackedAddress);
-  }, [uploadSuccess, isPreview, previewRows, documentRows, trackedAddress]);
+    const result = buildPreviewAnalytics(previewRows, trackedAddress);
+    console.log("DEBUG - tokenAnalytics result:", result);
+    return result;
+  }, [shouldShowDataView, previewRows, trackedAddress]);
 
   const trackedTokenSummary = useMemo(
     () =>
-      uploadSuccess && tokenAnalytics.length > 0
+      shouldShowDataView && tokenAnalytics.length > 0
         ? selectTrackedTokenSummary(tokenAnalytics)
         : null,
-    [uploadSuccess, tokenAnalytics],
+    [shouldShowDataView, tokenAnalytics],
   );
 
   const balanceTimeline = useMemo(() => {
-    if (!uploadSuccess || !trackedTokenSummary) {
+    if (!shouldShowDataView || !trackedTokenSummary) {
       return [];
     }
-    return isPreview
-      ? buildPreviewBalanceTimeline(
-          previewRows,
-          trackedAddress,
-          trackedTokenSummary,
-        )
-      : buildDocumentBalanceTimeline(
-          documentRows,
-          trackedAddress,
-          trackedTokenSummary,
-        );
-  }, [
-    uploadSuccess,
-    trackedTokenSummary,
-    isPreview,
-    previewRows,
-    documentRows,
-    trackedAddress,
-  ]);
+    return buildPreviewBalanceTimeline(
+      previewRows,
+      trackedAddress,
+      trackedTokenSummary,
+    );
+  }, [shouldShowDataView, trackedTokenSummary, previewRows, trackedAddress]);
 
   const monthlyAnalytics = useMemo(() => {
-    if (!uploadSuccess || !trackedTokenSummary) {
+    if (!shouldShowDataView || !trackedTokenSummary) {
       return [];
     }
-    const rows = isPreview ? previewRows : documentRows;
     return calculateMonthlyAnalytics(
-      rows,
-      isPreview,
+      previewRows,
+      true, // always use preview mode
       trackedAddress,
       trackedTokenSummary.key,
     );
-  }, [
-    uploadSuccess,
-    trackedTokenSummary,
-    isPreview,
-    previewRows,
-    documentRows,
-    trackedAddress,
-  ]);
+  }, [shouldShowDataView, trackedTokenSummary, previewRows, trackedAddress]);
 
   const sortedTransactions = useMemo(() => {
-    if (!uploadSuccess) {
+    if (!shouldShowDataView) {
       return [];
     }
-    const rows = isPreview ? previewRows : documentRows;
     return sortTransactions(
-      rows,
+      previewRows,
       sortField,
       sortDirection,
-      isPreview,
+      true, // always use preview mode
       trackedAddress,
     );
   }, [
-    uploadSuccess,
-    isPreview,
+    shouldShowDataView,
     previewRows,
-    documentRows,
     sortField,
     sortDirection,
     trackedAddress,
@@ -198,57 +224,79 @@ function EditorContent() {
     setSortField(field);
   }
 
-  // If we have upload success state, show success page regardless of document state
-  if (uploadSuccess) {
-    const displayRows = isPreview ? previewRows : documentRows;
-    const totalTransactions = displayRows.length;
+  // If we have transactions (from upload or existing in document), show the data view
+  if (shouldShowDataView) {
+    const totalTransactions = previewRows.length;
     return (
       <div className="py-4 px-8 max-w-7xl mx-auto">
-        <div className="text-center mt-8">
-          {/* Success Icon */}
-          <div className="flex justify-center mb-6">
-            <div className="rounded-full bg-green-100 p-3">
-              <svg
-                className="h-12 w-12 text-green-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+        <EditCryptoTransactionAnalyticsName />
+
+        {/* Show success message only for fresh uploads */}
+        {uploadSuccess && (
+          <div className="text-center mt-8">
+            {/* Success Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="rounded-full bg-green-100 p-3">
+                <svg
+                  className="h-12 w-12 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            {/* Success Message */}
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              CSV Upload Successful!
+            </h2>
+
+            {/* Transaction Count */}
+            <div className="max-w-3xl mx-auto grid gap-4 sm:grid-cols-2 mb-8">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                <p className="text-lg text-green-800 font-medium">
+                  {uploadSuccess.transactionCount} transactions detected
+                </p>
+                <p className="text-sm text-green-600 mt-2">
+                  Data has been processed and stored in the document
+                </p>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-left">
+                <p className="text-sm font-medium text-blue-800">
+                  Tracked EVM Address
+                </p>
+                <p className="mt-2 font-mono text-base text-blue-900 break-all">
+                  {trackedAddress}
+                </p>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Success Message */}
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            CSV Upload Successful!
-          </h2>
-
-          {/* Transaction Count */}
-          <div className="max-w-3xl mx-auto grid gap-4 sm:grid-cols-2 mb-8">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-              <p className="text-lg text-green-800 font-medium">
-                {uploadSuccess.transactionCount} transactions detected
-              </p>
-              <p className="text-sm text-green-600 mt-2">
-                Data has been processed and stored in the document
-              </p>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-left">
-              <p className="text-sm font-medium text-blue-800">
-                Tracked EVM Address
-              </p>
-              <p className="mt-2 font-mono text-base text-blue-900 break-all">
-                {trackedAddress}
-              </p>
+        {/* Summary header for existing data (no fresh upload) */}
+        {!uploadSuccess && (
+          <div className="mt-8 mb-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-800">
+                    {totalTransactions} transactions loaded
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Tracked Address: {shortenAddress(trackedAddress)}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Token Analytics */}
         {tokenAnalytics.length > 0 && (
@@ -374,8 +422,7 @@ function EditorContent() {
         {totalTransactions > 0 && (
           <div className="mt-8">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Imported Transactions ({totalTransactions}
-              {isPreview ? " preview" : ""})
+              Imported Transactions ({totalTransactions})
             </h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 bg-white shadow rounded-lg">
@@ -438,8 +485,11 @@ function EditorContent() {
               Debug Information
             </summary>
             <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-3 rounded border">
-              <p>Document ID: {uploadSuccess.documentId}</p>
-              <p>Transactions Imported: {uploadSuccess.transactionCount}</p>
+              <p>
+                Document ID:{" "}
+                {uploadSuccess?.documentId || document?.header?.id || "N/A"}
+              </p>
+              <p>Transactions in State: {totalTransactions}</p>
               <p>
                 Current Document State:{" "}
                 {document ? "Available" : "Disconnected"}
@@ -618,19 +668,9 @@ function filterPreviewTransactions(
   );
 }
 
-function filterDocumentTransactions(
-  rows: DocumentTransaction[],
-): DocumentTransaction[] {
-  return rows.filter(
-    (tx) =>
-      !tx.contractAddress ||
-      tx.contractAddress.toLowerCase() !== EXCLUDED_CONTRACT,
-  );
-}
-
 function deriveTrackedAddress(
   previewRows: ParsedTransaction[],
-  documentRows: DocumentTransaction[],
+  _documentRows: unknown[],
 ): string | null {
   const counts = new Map<string, { count: number; original: string }>();
 
@@ -646,13 +686,6 @@ function deriveTrackedAddress(
     consider(tx.fromAddress);
     consider(tx.toAddress);
   });
-
-  if (counts.size === 0) {
-    documentRows.forEach((tx) => {
-      consider(tx.fromAddress);
-      consider(tx.toAddress);
-    });
-  }
 
   if (counts.size === 0) {
     return null;
@@ -688,32 +721,6 @@ function buildPreviewAnalytics(
     existing.total += delta;
     existing.label = tx.token || existing.label;
     map.set(contractKey, existing);
-  });
-
-  return Array.from(map.values()).sort((a, b) => b.total - a.total);
-}
-
-function buildDocumentAnalytics(
-  rows: DocumentTransaction[],
-  trackedAddress: string | null,
-): TokenAnalyticsSummary[] {
-  const map = new Map<string, TokenAnalyticsSummary>();
-
-  rows.forEach((tx) => {
-    const delta = getDocumentSignedAmount(tx, trackedAddress);
-    if (!delta) return;
-    const contract = tx?.contractAddress || tx?.valueOut?.token || "UNKNOWN";
-    const label =
-      tx?.valueOut?.token || tx?.valueIn?.token || contract || "Unknown";
-
-    const existing = map.get(contract) || {
-      key: contract,
-      label,
-      total: 0,
-    };
-    existing.total += delta;
-    existing.label = label;
-    map.set(contract, existing);
   });
 
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
@@ -768,50 +775,11 @@ function buildPreviewBalanceTimeline(
   return points;
 }
 
-function buildDocumentBalanceTimeline(
-  rows: DocumentTransaction[],
-  trackedAddress: string | null,
-  tokenSummary: TokenAnalyticsSummary,
-): BalancePoint[] {
-  if (!tokenSummary) return [];
-  const sorted = [...rows].sort(
-    (a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp),
-  );
-
-  const points: BalancePoint[] = [];
-  let balance = 0;
-
-  if (sorted.length) {
-    const firstTimestamp = Date.parse(sorted[0].timestamp);
-    points.push({ timestamp: firstTimestamp - 1, balance: 0 });
-  }
-
-  sorted.forEach((tx) => {
-    if (getDocumentTokenKey(tx) !== tokenSummary.key) {
-      return;
-    }
-    const delta = computeDocumentDelta(tx, trackedAddress);
-    if (delta === 0) return;
-    const timestamp = Date.parse(tx.timestamp);
-    balance += delta;
-    points.push({ timestamp, balance });
-  });
-
-  return points;
-}
-
 function computePreviewDelta(
   tx: ParsedTransaction,
   trackedAddress: string | null,
 ): number {
   return getPreviewSignedAmount(tx, trackedAddress);
-}
-
-function computeDocumentDelta(
-  tx: DocumentTransaction,
-  trackedAddress: string | null,
-): number {
-  return getDocumentSignedAmount(tx, trackedAddress);
 }
 
 function getPreviewSignedAmount(
@@ -833,50 +801,19 @@ function getPreviewSignedAmount(
   return 0;
 }
 
-function getDocumentSignedAmount(
-  tx: DocumentTransaction,
-  trackedAddress: string | null,
-): number {
-  const normalized = trackedAddress?.toLowerCase();
-  if (!normalized) return 0;
-  const fromMatches = tx.fromAddress?.toLowerCase() === normalized;
-  const toMatches = tx.toAddress?.toLowerCase() === normalized;
-  const outgoingAmount = tx.valueOut?.amount ?? tx.valueIn?.amount ?? 0;
-  const incomingAmount = tx.valueIn?.amount ?? tx.valueOut?.amount ?? 0;
-  if (fromMatches && !toMatches) {
-    return -(outgoingAmount || 0);
-  }
-  if (toMatches && !fromMatches) {
-    return incomingAmount || 0;
-  }
-  return 0;
-}
-
 function getPreviewTokenKey(tx: ParsedTransaction) {
   return tx.contractAddress || tx.token || "UNKNOWN";
 }
 
-function getDocumentTokenKey(tx: DocumentTransaction) {
-  return (
-    tx.contractAddress || tx.valueOut?.token || tx.valueIn?.token || "UNKNOWN"
-  );
-}
-
 function sortTransactions(
-  rows: ParsedTransaction[] | DocumentTransaction[],
+  rows: ParsedTransaction[],
   field: SortField,
   direction: SortDirection,
-  isPreview: boolean,
+  _isPreview: boolean,
   trackedAddress: string | null,
 ): NormalizedTransactionRow[] {
   const normalized = rows.map((tx, index) =>
-    isPreview
-      ? normalizePreviewTransaction(
-          tx as ParsedTransaction,
-          index,
-          trackedAddress,
-        )
-      : normalizeDocumentTransaction(tx as DocumentTransaction, trackedAddress),
+    normalizePreviewTransaction(tx, index, trackedAddress),
   );
 
   const multiplier = direction === "asc" ? 1 : -1;
@@ -925,35 +862,6 @@ function normalizePreviewTransaction(
         ? `${tx.feeAmount.toFixed(6)} ${tx.feeToken}`.trim()
         : tx.rawFee || "N/A",
     status: tx.status || "UNKNOWN",
-  };
-}
-
-function normalizeDocumentTransaction(
-  tx: DocumentTransaction,
-  trackedAddress: string | null,
-): NormalizedTransactionRow {
-  const signedAmount = getDocumentSignedAmount(tx, trackedAddress);
-  const amountOut = tx.valueOut?.amount ?? tx.valueIn?.amount ?? 0;
-
-  return {
-    id: tx.id,
-    txHash: tx.txHash,
-    timestamp: tx.timestamp,
-    rawTimestamp: "",
-    amountNumeric: signedAmount || amountOut || 0,
-    amountDisplay:
-      signedAmount !== 0
-        ? signedAmount.toFixed(4)
-        : amountOut
-          ? amountOut.toFixed(4)
-          : "0",
-    token:
-      tx.valueOut?.token ||
-      tx.valueIn?.token ||
-      tx.contractAddress ||
-      "Unknown",
-    feeDisplay: `${tx.txnFee.amount.toFixed(4)} ${tx.txnFee.token}`,
-    status: tx.status,
   };
 }
 
@@ -1294,8 +1202,8 @@ interface MonthlyAnalytics {
 }
 
 function calculateMonthlyAnalytics(
-  rows: ParsedTransaction[] | DocumentTransaction[],
-  isPreview: boolean,
+  rows: ParsedTransaction[],
+  _isPreview: boolean,
   trackedAddress: string | null,
   tokenKey: string,
 ): MonthlyAnalytics[] {
@@ -1312,22 +1220,10 @@ function calculateMonthlyAnalytics(
   }
 
   rows.forEach((tx) => {
-    let timestamp: Date;
-    let tokenMatch = false;
-    let signedAmount = 0;
-
-    if (isPreview) {
-      const previewTx = tx as ParsedTransaction;
-      if (!previewTx.timestamp) return;
-      timestamp = new Date(previewTx.timestamp);
-      tokenMatch = getPreviewTokenKey(previewTx) === tokenKey;
-      signedAmount = getPreviewSignedAmount(previewTx, trackedAddress);
-    } else {
-      const docTx = tx as DocumentTransaction;
-      timestamp = new Date(docTx.timestamp);
-      tokenMatch = getDocumentTokenKey(docTx) === tokenKey;
-      signedAmount = getDocumentSignedAmount(docTx, trackedAddress);
-    }
+    if (!tx.timestamp) return;
+    const timestamp = new Date(tx.timestamp);
+    const tokenMatch = getPreviewTokenKey(tx) === tokenKey;
+    const signedAmount = getPreviewSignedAmount(tx, trackedAddress);
 
     if (!tokenMatch || timestamp < sixMonthsAgo) return;
 

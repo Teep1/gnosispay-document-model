@@ -1,6 +1,6 @@
 {
-  "name": "gnosispay-powerhouse-analyser",
-  "description": "GnosisPay transaction analyzer built with Powerhouse - track and analyze crypto card spending with multi-token support, interactive charts, and comprehensive transaction analytics",
+  "name": "gnosis-tx-analytics",
+  "description": "",
   "version": "1.0.0",
   "license": "AGPL-3.0-only",
   "type": "module",

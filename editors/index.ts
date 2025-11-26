@@ -1,1 +1,1 @@
-export { CryptoTransactionAnalyticsEditor } from "./crypto-transaction-analytics-editor/module.js";
+export { CryptoTxAnalyticsEditor } from "./crypto-tx-analytics-editor/module.js";

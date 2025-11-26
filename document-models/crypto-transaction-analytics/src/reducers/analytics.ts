@@ -1,4 +1,4 @@
-import type { CryptoTransactionAnalyticsAnalyticsOperations } from "ba-workshop/document-models/crypto-transaction-analytics";
+import type { CryptoTransactionAnalyticsAnalyticsOperations } from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 
 export const cryptoTransactionAnalyticsAnalyticsOperations: CryptoTransactionAnalyticsAnalyticsOperations =
   {
@@ -14,13 +14,11 @@ export const cryptoTransactionAnalyticsAnalyticsOperations: CryptoTransactionAna
         return;
       }
 
-      // Calculate total spent
       let totalAmount = 0;
       const tokenAmounts: Record<string, number> = {};
       const monthlyAmounts: Record<string, number> = {};
 
       transactions.forEach((tx) => {
-        // Use converted values if available, otherwise use original values
         let amount = 0;
         const token = action.input.baseCurrency;
 
@@ -42,18 +40,15 @@ export const cryptoTransactionAnalyticsAnalyticsOperations: CryptoTransactionAna
         if (amount > 0) {
           totalAmount += amount;
 
-          // Track by original token
           const originalToken = tx.valueOut?.token || "Unknown";
           tokenAmounts[originalToken] =
             (tokenAmounts[originalToken] || 0) + (tx.valueOut?.amount || 0);
 
-          // Track monthly breakdown
-          const month = new Date(tx.timestamp).toISOString().substring(0, 7); // YYYY-MM
+          const month = new Date(tx.timestamp).toISOString().substring(0, 7);
           monthlyAmounts[month] = (monthlyAmounts[month] || 0) + amount;
         }
       });
 
-      // Build analytics
       state.analytics = {
         totalSpent:
           totalAmount > 0

@@ -19,6 +19,7 @@ import type {
   Transaction,
   TransactionMetadata,
   TransactionStatus,
+  TransactionStatusInput,
   UpdateExchangeRatesInput,
   UpdateTransactionInput,
 } from "./types.js";
@@ -38,6 +39,8 @@ export const definedNonNullAnySchema = z
 
 export const TransactionStatusSchema = z.enum(["FAILED", "SUCCESS"]);
 
+export const TransactionStatusInputSchema = z.enum(["FAILED", "SUCCESS"]);
+
 export function AddTransactionInputSchema(): z.ZodObject<
   Properties<AddTransactionInput>
 > {
@@ -51,7 +54,7 @@ export function AddTransactionInputSchema(): z.ZodObject<
     historicalPrice: z.lazy(() => PriceInfoInputSchema().nullish()),
     id: z.string(),
     method: z.string().nullish(),
-    status: TransactionStatusSchema,
+    status: z.lazy(() => TransactionStatusInputSchema),
     timestamp: z.string().datetime(),
     toAddress: z.string().nullish(),
     txHash: z.string(),

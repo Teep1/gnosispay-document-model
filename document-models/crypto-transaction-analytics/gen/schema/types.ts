@@ -66,7 +66,7 @@ export type AddTransactionInput = {
   historicalPrice?: InputMaybe<PriceInfoInput>;
   id: Scalars["OID"]["input"];
   method?: InputMaybe<Scalars["String"]["input"]>;
-  status: TransactionStatus;
+  status: TransactionStatusInput;
   timestamp: Scalars["DateTime"]["input"];
   toAddress?: InputMaybe<Scalars["String"]["input"]>;
   txHash: Scalars["String"]["input"];
@@ -185,6 +185,8 @@ export type TransactionMetadata = {
 };
 
 export type TransactionStatus = "FAILED" | "SUCCESS";
+
+export type TransactionStatusInput = "FAILED" | "SUCCESS";
 
 export type UpdateExchangeRatesInput = {
   rates: Array<ExchangeRateInput>;

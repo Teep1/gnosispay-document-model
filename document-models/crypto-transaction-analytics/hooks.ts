@@ -8,7 +8,7 @@ import {
 import type {
   CryptoTransactionAnalyticsDocument,
   CryptoTransactionAnalyticsAction,
-} from "ba-workshop/document-models/crypto-transaction-analytics";
+} from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 import { isCryptoTransactionAnalyticsDocument } from "./gen/document-schema.js";
 
 /** Hook to get a CryptoTransactionAnalytics document by its id */

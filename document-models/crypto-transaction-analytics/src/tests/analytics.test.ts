@@ -11,7 +11,7 @@ import {
   isCryptoTransactionAnalyticsDocument,
   calculateAnalytics,
   CalculateAnalyticsInputSchema,
-} from "ba-workshop/document-models/crypto-transaction-analytics";
+} from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 
 describe("Analytics Operations", () => {
   it("should handle calculateAnalytics operation", () => {

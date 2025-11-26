@@ -17,7 +17,7 @@ import {
   assertIsCryptoTransactionAnalyticsDocument,
   isCryptoTransactionAnalyticsState,
   assertIsCryptoTransactionAnalyticsState,
-} from "ba-workshop/document-models/crypto-transaction-analytics";
+} from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 import { ZodError } from "zod";
 
 describe("CryptoTransactionAnalytics Document Model", () => {

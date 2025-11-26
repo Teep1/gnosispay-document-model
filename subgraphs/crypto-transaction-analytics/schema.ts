@@ -87,7 +87,7 @@ export const schema: DocumentNode = gql`
     historicalPrice: CryptoTransactionAnalytics_PriceInfoInput
     currentValue: CryptoTransactionAnalytics_PriceInfoInput
     convertedValue: CryptoTransactionAnalytics_PriceInfoInput
-    status: CryptoTransactionAnalytics_TransactionStatus!
+    status: CryptoTransactionAnalytics_TransactionStatusInput!
     errorCode: String
     method: String
   }
@@ -102,6 +102,12 @@ export const schema: DocumentNode = gql`
     amount: Float!
     currency: Currency!
   }
+
+  enum CryptoTransactionAnalytics_TransactionStatusInput {
+    SUCCESS
+    FAILED
+  }
+
   input CryptoTransactionAnalytics_UpdateTransactionInput {
     id: OID!
     txHash: String
@@ -110,12 +116,12 @@ export const schema: DocumentNode = gql`
     fromAddress: String
     toAddress: String
     contractAddress: String
-    valueIn: TokenValueInput
-    valueOut: TokenValueInput
-    txnFee: TokenValueInput
-    historicalPrice: PriceInfoInput
-    currentValue: PriceInfoInput
-    convertedValue: PriceInfoInput
+    valueIn: CryptoTransactionAnalytics_TokenValueInput
+    valueOut: CryptoTransactionAnalytics_TokenValueInput
+    txnFee: CryptoTransactionAnalytics_TokenValueInput
+    historicalPrice: CryptoTransactionAnalytics_PriceInfoInput
+    currentValue: CryptoTransactionAnalytics_PriceInfoInput
+    convertedValue: CryptoTransactionAnalytics_PriceInfoInput
     status: CryptoTransactionAnalytics_TransactionStatus
     errorCode: String
     method: String

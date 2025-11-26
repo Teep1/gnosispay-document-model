@@ -12,15 +12,7 @@
             "name": "CryptoTransactionAnalytics"
         }
     ],
-    "editors": [
-        {
-            "id": "crypto-transaction-analytics-editor",
-            "name": "Crypto Transaction Analytics Editor",
-            "documentTypes": [
-                "crypto/transaction-analytics"
-            ]
-        }
-    ],
+    "editors": [],
     "apps": [],
     "subgraphs": [],
     "importScripts": []

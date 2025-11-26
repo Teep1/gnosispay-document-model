@@ -1,7 +1,7 @@
 import { setName } from "document-model";
 import type { FormEventHandler, MouseEventHandler } from "react";
 import { useState } from "react";
-import { useSelectedCryptoTransactionAnalyticsDocument } from "ba-workshop/document-models/crypto-transaction-analytics";
+import { useSelectedCryptoTransactionAnalyticsDocument } from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 
 /** Displays the name of the selected CryptoTransactionAnalytics document and allows editing it */
 export function EditCryptoTransactionAnalyticsName() {

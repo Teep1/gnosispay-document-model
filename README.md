@@ -1,194 +1,179 @@
-# GnosisPay Powerhouse Analyser
+# Document Model Boilerplate
 
-A sophisticated transaction analytics tool built with Powerhouse for GnosisPay users. Track, analyze, and visualize your crypto card spending with comprehensive transaction analytics, interactive charts, and multi-token support.
+This Document Model Boilerplate provides code generation for scaffolding editors and models. 
+It ensures compatibility with host applications like Connect and the Reactors for seamless document model and editor integration.
 
-## 🚀 Features
+## Standard Document Model Workflow with help of the boilerplate.
+This tutorial will guide you through the process of creating a new document model using the Document Model Editor in the Connect app. 
 
-### 📊 Interactive Analytics Dashboard
-- **Balance Timeline**: Interactive chart with hover tooltips showing date and amount details
-- **Monthly Overview**: Last 6 months of income/expense breakdown with color-coded visualization
-- **Token Analytics**: Comprehensive analysis grouped by contract address and token type
-- **Transaction Insights**: Detailed transaction history with smart filtering
+<details>
+<summary>Available NPM commands</summary>
 
-### 📁 Data Management
-- **CSV Import**: Supports various CSV formats from exchanges and wallets
-- **Smart Parsing**: Automatically detects and maps common CSV column formats
-- **Address Tracking**: Configurable wallet address tracking with exclusion filters
-- **Multi-token Support**: Handles multiple cryptocurrencies and tokens
+-   `generate`: Updates the generated code according to the JSON spec and GraphQL schema of your document model, made in Connect.
+-   `lint`: Checks for errors with ESLint and TypeScript checking.
+-   `format`: Formats the code using Prettier.
+-   `build`: Builds the library project using Vite.
+-   `storybook`: Starts Storybook in development mode.
+-   `build-storybook`: Builds Storybook.
+-   `test`: Runs Jest for testing.
 
-### 🔧 Technical Features
-- **Environment-based Configuration**: Secure address management via environment variables
-- **Real-time Updates**: Live transaction processing and analytics updates
-- **Responsive Design**: Mobile-friendly interface with Tailwind CSS
-- **Type Safety**: Full TypeScript support with comprehensive type definitions
+</details>
 
-## 🛠️ Quick Start
+### 1. Defining Your Document Model GraphQL Schema
+Start by creating your own 'Powerhouse Project' (Document model + editor).
 
-### Prerequisites
-- Node.js 18+ and npm
-- Git
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd gnosispay-powerhouse-analyser
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Environment Setup**
-   ```bash
-   # Copy environment template
-   cp .env.example .env
-
-   # Edit .env with your addresses
-   nano .env
-   ```
-
-4. **Start Development Server**
-   ```bash
-   npm run vetra
-   ```
-
-5. **Open in Browser**
-   Navigate to the localhost URL shown in your terminal
-
-## 🔧 Environment Configuration
-
-The application requires environment variables for secure address management:
+Step 1: Run the following command to set up your project inside this directory:
 
 ```bash
-# Tracked ETH Address - The main wallet address to track in analytics
-VITE_TRACKED_ETH_ADDRESS=your_wallet_address_here
-
-# Excluded Contract Address - Contract address to exclude from analysis
-VITE_EXCLUDED_CONTRACT_ADDRESS=excluded_contract_address_here
+npm create document-model-lib
 ```
 
-### Environment Variables Reference
+Step 2: Use the Document Model Editor in the Connect app
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `VITE_TRACKED_ETH_ADDRESS` | Main Ethereum wallet address to track | Yes |
-| `VITE_EXCLUDED_CONTRACT_ADDRESS` | Contract address to exclude (e.g., spam contracts) | Yes |
-
-## 📊 Usage
-
-### Importing Transactions
-
-1. **Prepare CSV Data**
-   - Export transaction data from your exchange or wallet
-   - Ensure CSV contains standard columns: Transaction Hash, DateTime, Amount, Token, etc.
-
-2. **Upload via Interface**
-   - Use the CSV upload component in the application
-   - The system automatically detects and maps column formats
-   - Review the preview before confirming import
-
-3. **Analyze Results**
-   - View interactive charts and analytics
-   - Explore monthly breakdowns and token-specific insights
-   - Use hover tooltips for detailed transaction information
-
-### Supported CSV Formats
-
-The analyzer supports common CSV formats from:
-- Cryptocurrency exchanges (Coinbase, Binance, Kraken, etc.)
-- Wallet providers (MetaMask exports, hardware wallet software)
-- Custom formats with standard column naming
-
-Expected columns include:
-- `Transaction Hash` / `TxHash` / `Hash`
-- `DateTime (UTC)` / `Timestamp` / `Date`
-- `Value_OUT` / `Amount_OUT` / `Amount`
-- `Value_IN` / `Amount_IN`
-- `Token Symbol` / `Asset` / `Currency`
-- `Txn Fee` / `Fee`
-- `Status` / `State`
-
-## 🏗️ Technical Architecture
-
-### Document Model System
-Built on Powerhouse's document model architecture:
-- **Document Models**: Schema definitions for transaction data
-- **Operations**: CRUD operations for transaction management
-- **Reducers**: Pure functions handling state transitions
-- **Hooks**: React hooks for document state management
-
-### Key Components
-- **Editor**: Main application interface
-- **CSV Uploader**: Transaction data import functionality
-- **Analytics Engine**: Real-time calculation and visualization
-- **Balance Timeline**: Interactive chart component with hover support
-
-## 🧪 Development
-
-### Available Scripts
+The following command gives you access to all the powerhouse CLI tools available, install it globally if you are a poweruser. 
 
 ```bash
-# Development
-npm run vetra          # Start development server
-npm run tsc:watch     # TypeScript compilation in watch mode
+npm install ph-cmd
+```
+Now you are able to launch Connect in Studio Mode (Locally):
 
-# Building
-npm run build         # Build for production
-npm run tsc           # TypeScript compilation
-
-# Code Quality
-npm run lint          # Run ESLint
-npm run lint:fix      # Fix ESLint issues automatically
-npm test              # Run tests
-
-# Generation
-npm run generate      # Generate code from document models
+```bash
+npm run connect
 ```
 
-### Project Structure
+Open the 'Document Model' creator at the bottom of connect to define your document mode with it's GraphQL Schema Definition.
+This schema will define the structure and fields for your document model using GraphQL. 
+Follow one of our tutorials on Academy to get familiar with the process. 
 
+### 2. Defining Document Model Operations
+Using the Document Model Operations Editor, define the operations for your document model and their GraphQL counterparts. 
+These operations will handle state changes within your document model.
+
+**Best Practices:**
+
+- Clearly define CRUD operations (Create, Read, Update, Delete).
+- Use GraphQL input types to specify the parameters for each operation.
+- Ensure that operations align with user intent to maintain a clean and understandable API.
+
+### 3. Generating Scaffolding Code
+Export your document model as a .zip file from Connect.
+Import the .zip file into your project directory created in Step 1.
+Run the following command to generate the scaffolding code:
+
+```bash
+npm run generate YourModelName.phdm.zip
 ```
-├── document-models/           # Powerhouse document models
-│   └── crypto-transaction-analytics/
-├── editors/                   # Application editors
-│   └── crypto-transaction-analytics-editor/
-├── subgraphs/                # GraphQL schema definitions
-├── dist/                     # Built files
-├── .env.example             # Environment template
-├── package.json             # Dependencies and scripts
-└── README.md                # This file
+
+This will create a new directory under /document-models containing:
+
+JSON file with the document model specification.
+GraphQL file with state and operation schemas.
+A gen/ folder with autogenerated code.
+A src/ folder for your custom code implementation.
+
+### 4. Implementing Reducer Code and Unit Tests
+Navigate to the reducer directory:
+
+```bash
+cd document-models/"YourModelName"/src/reducers
 ```
 
-## 🔒 Security
+Implement the reducer functions for each document model operation. These functions will handle state transitions.
 
-- **Environment Variables**: Sensitive addresses stored in `.env` (gitignored)
-- **Type Safety**: Full TypeScript coverage prevents runtime errors
-- **Input Validation**: CSV data validation and sanitization
-- **No Hardcoded Secrets**: All sensitive data configurable via environment
+Add utility functions in:
 
-## 🤝 Contributing
+```bash
+document-models/"YourModelName"/src/utils.ts
+```
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Write unit tests to ensure the correctness of your reducers:
 
-## 📄 License
+Test files should be located in:
 
-This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+```bash
+document-models/"YourModelName"/src/reducers/tests
+```
 
-## 🆘 Support
+Run the tests:
 
-If you encounter issues:
-1. Check the [Environment Configuration](#environment-configuration) section
-2. Ensure your CSV format matches supported schemas
-3. Verify Node.js and npm versions meet requirements
-4. Open an issue with detailed error information
+```bash
+npm test
+```
 
----
+Test the editor functionality:
 
-**Built with ❤️ using [Powerhouse](https://powerhouse.io) - The next-generation document engineering platform**
+```bash
+npm run connect
+```
+
+### 5. Implementing Document Editors
+Generate the editor template for your document model:
+
+```bash
+npm run generate -- --editor YourModelName --document-types powerhouse/YourModelName
+```
+
+The --editor flag specifies the name of your document model.
+The --document-types flag links the editor to your document model type.
+After generation:
+
+Open the editor template:
+
+```bash
+editors/YourModelName/editor.tsx
+```
+
+Customize the editor interface to suit your document model.
+
+### 6. Testing the Document Editor
+Run the Connect app to test your document editor:
+
+```bash
+npm run connect
+```
+
+Verify that the editor functions as expected.
+Perform end-to-end testing to ensure smooth integration between the document model and its editor.
+
+### 7. Adding a Manifest File
+Create a manifest file to describe your document model and editor. This enables proper integration with the host application.
+
+**Example manifest.json:**
+
+```json
+{
+  "name": "your-model-name",
+  "description": "A brief description of your document model.",
+  "category": "your-category", // e.g., "Finance", "People Ops", "Legal"
+  "publisher": {
+    "name": "your-publisher-name",
+    "url": "your-publisher-url"
+  },
+  "documentModels": [
+    {
+      "id": "your-model-id",
+      "name": "your-model-name"
+    }
+  ],
+  "editors": [
+    {
+      "id": "your-editor-id",
+      "name": "your-editor-name",
+      "documentTypes": ["your-model-id"]
+    }
+  ]
+}
+```
+
+### Steps to finalize:
+
+Place the manifest file at your project root.
+Update your index.js to export your modules and include the new document model and editor.
+
+### Final Thoughts
+You've now successfully created a Document Model and its corresponding Editor using the Connect app!
+
+Next Steps:
+- Expand functionality: Add more operations or complex logic to your document model.
+- Improve UX: Enhance the document editor for a smoother user experience.
+- Integrate with other systems: Use APIs or GraphQL to connect your document model with external services.

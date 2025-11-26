@@ -4,7 +4,7 @@ import { setName } from "document-model";
 import {
   actions,
   cryptoTransactionAnalyticsDocumentType,
-} from "ba-workshop/document-models/crypto-transaction-analytics";
+} from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 
 import type {
   CryptoTransactionAnalyticsDocument,
@@ -16,7 +16,7 @@ import type {
   UpdateExchangeRatesInput,
   ConvertTransactionValuesInput,
   CalculateAnalyticsInput,
-} from "ba-workshop/document-models/crypto-transaction-analytics";
+} from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 
 export const getResolvers = (
   subgraph: BaseSubgraph,

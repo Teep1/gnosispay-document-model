@@ -1,4 +1,4 @@
 import type { EditorModule } from "document-model";
-import { CryptoTransactionAnalyticsEditor } from "./crypto-transaction-analytics-editor/module.js";
+import { CryptoTxAnalyticsEditor } from "./crypto-tx-analytics-editor/module.js";
 
-export const editors: EditorModule[] = [CryptoTransactionAnalyticsEditor];
+export const editors: EditorModule[] = [CryptoTxAnalyticsEditor];

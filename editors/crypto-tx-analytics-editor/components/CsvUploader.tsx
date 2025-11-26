@@ -1,9 +1,13 @@
 import { useState } from "react";
-import { useSelectedCryptoTransactionAnalyticsDocument } from "ba-workshop/document-models/crypto-transaction-analytics";
+import { generateId } from "document-model/core";
+import {
+  useSelectedCryptoTransactionAnalyticsDocument,
+  importCsvTransactions,
+} from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 
 const CONTRACTS_TO_EXCLUDE = new Set([
-  import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
-    "0x0000000000000000000000000000000000000000",
+  // import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
+  "0x0000000000000000000000000000000000000000",
 ]);
 
 export interface ParsedTransaction {
@@ -33,7 +37,7 @@ interface CsvUploaderProps {
 }
 
 export function CsvUploader({ onUploadSuccess }: CsvUploaderProps) {
-  const [document] = useSelectedCryptoTransactionAnalyticsDocument();
+  const [document, dispatch] = useSelectedCryptoTransactionAnalyticsDocument();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
     type: "success" | "error";
@@ -45,6 +49,11 @@ export function CsvUploader({ onUploadSuccess }: CsvUploaderProps) {
 
   if (!document) {
     console.log("CsvUploader - No document, returning null");
+    return null;
+  }
+
+  if (!dispatch) {
+    console.log("CsvUploader - No dispatch function available");
     return null;
   }
 
@@ -198,9 +207,19 @@ export function CsvUploader({ onUploadSuccess }: CsvUploaderProps) {
             !CONTRACTS_TO_EXCLUDE.has(tx.contractAddress.toLowerCase()),
         );
 
-      console.log(
-        "CSV upload disabled: skipping document mutations for debugging.",
+      // Generate unique IDs for each transaction
+      const transactionIds = transactions.map(() => generateId());
+
+      // Dispatch the importCsvTransactions action to store data in document state
+      console.log("Dispatching importCsvTransactions action...");
+      dispatch(
+        importCsvTransactions({
+          csvData,
+          timestamp: new Date().toISOString(),
+          transactionIds,
+        }),
       );
+      console.log("CSV data stored in document state");
 
       if (onUploadSuccess) {
         onUploadSuccess({
@@ -212,7 +231,7 @@ export function CsvUploader({ onUploadSuccess }: CsvUploaderProps) {
 
       setUploadResult({
         type: "success",
-        message: `Detected ${dataRows} transactions from CSV (no state change)`,
+        message: `Successfully imported ${transactions.length} transactions`,
       });
     } catch (error) {
       console.error("CSV Upload Error:", error);

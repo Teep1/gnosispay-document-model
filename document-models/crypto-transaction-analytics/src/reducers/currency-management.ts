@@ -1,5 +1,4 @@
-import { TransactionNotFoundError } from "../../gen/currency-management/error.js";
-import type { CryptoTransactionAnalyticsCurrencyManagementOperations } from "ba-workshop/document-models/crypto-transaction-analytics";
+import type { CryptoTransactionAnalyticsCurrencyManagementOperations } from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
 
 export const cryptoTransactionAnalyticsCurrencyManagementOperations: CryptoTransactionAnalyticsCurrencyManagementOperations =
   {
@@ -7,7 +6,6 @@ export const cryptoTransactionAnalyticsCurrencyManagementOperations: CryptoTrans
       state.settings.baseCurrency = action.input.baseCurrency;
     },
     updateExchangeRatesOperation(state, action) {
-      // Update exchange rates
       state.settings.exchangeRates = action.input.rates;
       state.settings.lastForexUpdate = action.input.timestamp;
     },
@@ -16,12 +14,11 @@ export const cryptoTransactionAnalyticsCurrencyManagementOperations: CryptoTrans
         (t) => t.id === action.input.transactionId,
       );
       if (!transaction) {
-        throw new TransactionNotFoundError(
+        throw new Error(
           `Transaction with ID ${action.input.transactionId} not found`,
         );
       }
 
-      // Find exchange rate for conversion
       const findExchangeRate = (fromCurrency: string, toCurrency: string) => {
         return state.settings.exchangeRates.find(
           (rate) =>
@@ -30,7 +27,6 @@ export const cryptoTransactionAnalyticsCurrencyManagementOperations: CryptoTrans
         );
       };
 
-      // Convert values if exchange rates are available
       if (
         transaction.valueIn &&
         transaction.valueIn.token !== action.input.baseCurrency
@@ -47,7 +43,6 @@ export const cryptoTransactionAnalyticsCurrencyManagementOperations: CryptoTrans
         }
       }
 
-      // Update USD values in token values
       if (transaction.txnFee && action.input.baseCurrency === "USD") {
         const rate = findExchangeRate(transaction.txnFee.token, "USD");
         if (rate) {
