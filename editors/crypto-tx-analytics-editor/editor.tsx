@@ -79,6 +79,13 @@ function EditorContent() {
   const [sortField, setSortField] = useState<SortField>("timestamp");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
+  // Filter states
+  const [tokenFilter, setTokenFilter] = useState<string>("");
+  const [contractFilter, setContractFilter] = useState<string>("");
+  const [minAmountFilter, setMinAmountFilter] = useState<string>("");
+  const [maxAmountFilter, setMaxAmountFilter] = useState<string>("");
+  const [monthFilter, setMonthFilter] = useState<string>("");
+
   console.log("EditorContent render - document:", document);
   console.log("Document exists:", !!document);
   console.log("Upload success state:", uploadSuccess);
@@ -198,12 +205,68 @@ function EditorContent() {
     );
   }, [shouldShowDataView, trackedTokenSummary, previewRows, trackedAddress]);
 
+  const filteredTransactions = useMemo(() => {
+    if (!shouldShowDataView) {
+      return [];
+    }
+
+    return previewRows.filter(tx => {
+      // Token filter
+      if (tokenFilter && tx.token !== tokenFilter) {
+        return false;
+      }
+
+      // Contract filter
+      if (contractFilter && tx.contractAddress !== contractFilter) {
+        return false;
+      }
+
+      // Amount filters - need to get the absolute value for filtering
+      const txAmount = Math.abs(tx.amountIn ?? tx.amountOut ?? 0);
+
+      // Min amount filter
+      if (minAmountFilter) {
+        const minAmount = parseFloat(minAmountFilter);
+        if (!isNaN(minAmount) && txAmount < minAmount) {
+          return false;
+        }
+      }
+
+      // Max amount filter
+      if (maxAmountFilter) {
+        const maxAmount = parseFloat(maxAmountFilter);
+        if (!isNaN(maxAmount) && txAmount > maxAmount) {
+          return false;
+        }
+      }
+
+      // Month filter
+      if (monthFilter && tx.timestamp) {
+        const txDate = new Date(tx.timestamp);
+        const txMonth = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+        if (txMonth !== monthFilter) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    shouldShowDataView,
+    previewRows,
+    tokenFilter,
+    contractFilter,
+    minAmountFilter,
+    maxAmountFilter,
+    monthFilter,
+  ]);
+
   const sortedTransactions = useMemo(() => {
     if (!shouldShowDataView) {
       return [];
     }
     return sortTransactions(
-      previewRows,
+      filteredTransactions,
       sortField,
       sortDirection,
       true, // always use preview mode
@@ -211,7 +274,7 @@ function EditorContent() {
     );
   }, [
     shouldShowDataView,
-    previewRows,
+    filteredTransactions,
     sortField,
     sortDirection,
     trackedAddress,
@@ -357,57 +420,64 @@ function EditorContent() {
 
               {/* Monthly Income/Expense Overview */}
               {monthlyAnalytics.length > 0 && (
-                <div className="px-6 py-4 border-t border-gray-100">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="text-md font-medium text-gray-900">
+                <div className="px-6 py-6 border-t border-gray-100">
+                  <div className="flex justify-between items-center mb-6">
+                    <h4 className="text-lg font-semibold text-gray-900">
                       Previous 6 Months Overview ({trackedTokenSummary.label})
                     </h4>
-                    <div className="flex items-center space-x-4 text-xs text-gray-500">
-                      <div className="flex items-center space-x-1">
-                        <div className="w-3 h-3 bg-green-600 rounded-sm"></div>
-                        <span>Income</span>
+                    <div className="flex items-center space-x-6 text-sm text-gray-600">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-green-500 rounded"></div>
+                        <span className="font-medium">Income</span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <div className="w-3 h-3 bg-red-600 rounded-sm"></div>
-                        <span>Expense</span>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-red-500 rounded"></div>
+                        <span className="font-medium">Expense</span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <div className="w-3 h-3 bg-gray-600 rounded-sm"></div>
-                        <span>Net</span>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-gray-600 rounded"></div>
+                        <span className="font-medium">Net</span>
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-6 gap-4 text-sm">
+                  <div className="grid grid-cols-6 gap-6">
                     {monthlyAnalytics.map((month) => (
-                      <div key={month.month} className="text-center">
-                        <div className="font-medium text-gray-700 mb-2 text-xs">
+                      <div key={month.month} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="font-semibold text-gray-800 mb-4 text-center text-sm">
                           {month.month}
                         </div>
-                        <div className="space-y-1">
-                          <div className="text-green-600 text-xs">
-                            +
-                            {month.income.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 1,
-                            })}
+                        <div className="space-y-3">
+                          <div className="bg-green-50 p-3 rounded-md">
+                            <div className="text-xs text-green-700 font-medium mb-1">Income</div>
+                            <div className="text-green-600 font-bold text-lg">
+                              +{month.income.toLocaleString(undefined, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 1,
+                              })}
+                            </div>
                           </div>
-                          <div className="text-red-600 text-xs">
-                            -
-                            {month.expense.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 1,
-                            })}
+                          <div className="bg-red-50 p-3 rounded-md">
+                            <div className="text-xs text-red-700 font-medium mb-1">Expense</div>
+                            <div className="text-red-600 font-bold text-lg">
+                              -{month.expense.toLocaleString(undefined, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 1,
+                              })}
+                            </div>
                           </div>
-                          <div
-                            className={`font-medium text-xs ${
-                              month.net >= 0 ? "text-green-600" : "text-red-600"
-                            }`}
-                          >
-                            {month.net >= 0 ? "+" : ""}
-                            {month.net.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 1,
-                            })}
+                          <div className={`${month.net >= 0 ? "bg-green-50" : "bg-red-50"} p-3 rounded-md border-2 ${month.net >= 0 ? "border-green-200" : "border-red-200"}`}>
+                            <div className="text-xs text-gray-700 font-medium mb-1">Net Total</div>
+                            <div
+                              className={`font-bold text-xl ${
+                                month.net >= 0 ? "text-green-600" : "text-red-600"
+                              }`}
+                            >
+                              {month.net >= 0 ? "+" : ""}
+                              {month.net.toLocaleString(undefined, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 1,
+                              })}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -421,9 +491,134 @@ function EditorContent() {
         {/* Transaction List */}
         {totalTransactions > 0 && (
           <div className="mt-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Imported Transactions ({totalTransactions})
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Imported Transactions
+              </h3>
+              <div className="text-sm text-gray-600">
+                Showing {filteredTransactions.length} of {totalTransactions} transactions
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="min-w-0 flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Filter by Token
+                  </label>
+                  <select
+                    value={tokenFilter}
+                    onChange={(e) => setTokenFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All Tokens</option>
+                    {Array.from(new Set(previewRows.map(tx => tx.token).filter(Boolean))).map(token => (
+                      <option key={token} value={token}>{token}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Filter by Contract
+                  </label>
+                  <select
+                    value={contractFilter}
+                    onChange={(e) => setContractFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All Contracts</option>
+                    {Array.from(new Set(previewRows.map(tx => tx.contractAddress).filter(Boolean))).map(contract => (
+                      <option key={contract} value={contract}>
+                        {contract.length > 16 ? `${contract.substring(0, 8)}...${contract.substring(contract.length - 6)}` : contract}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Min Amount
+                  </label>
+                  <input
+                    type="number"
+                    value={minAmountFilter}
+                    onChange={(e) => setMinAmountFilter(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Max Amount
+                  </label>
+                  <input
+                    type="number"
+                    value={maxAmountFilter}
+                    onChange={(e) => setMaxAmountFilter(e.target.value)}
+                    placeholder="No limit"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Filter by Month
+                  </label>
+                  <select
+                    value={monthFilter}
+                    onChange={(e) => setMonthFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All Months</option>
+                    {Array.from(new Set(
+                      previewRows
+                        .filter(tx => tx.timestamp)
+                        .map(tx => {
+                          const date = new Date(tx.timestamp!);
+                          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                        })
+                    )).sort().reverse().map(month => {
+                      const [year, monthNum] = month.split('-');
+                      const date = new Date(parseInt(year), parseInt(monthNum) - 1);
+                      const displayName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                      return (
+                        <option key={month} value={month}>{displayName}</option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setTokenFilter("");
+                      setContractFilter("");
+                      setMinAmountFilter("");
+                      setMaxAmountFilter("");
+                      setMonthFilter("");
+                    }}
+                    className="px-3 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {filteredTransactions.length === 0 ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                <div className="text-yellow-600 mb-2">
+                  <svg className="mx-auto h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <p className="text-sm text-yellow-800 font-medium">No transactions match your filters</p>
+                <p className="text-xs text-yellow-700 mt-1">Try adjusting your filter criteria or clearing all filters</p>
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 bg-white shadow rounded-lg">
                 <thead className="bg-gray-50">
@@ -446,12 +641,6 @@ function EditorContent() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Token
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fee
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -463,18 +652,17 @@ function EditorContent() {
                       rawTimestamp={tx.rawTimestamp}
                       amountDisplay={tx.amountDisplay}
                       token={tx.token}
-                      feeDisplay={tx.feeDisplay}
-                      status={tx.status}
                     />
                   ))}
                 </tbody>
               </table>
-              {totalTransactions > 100 && (
+              {filteredTransactions.length > 100 && (
                 <div className="px-6 py-3 bg-gray-50 text-sm text-gray-500 text-center">
-                  Showing first 100 transactions of {totalTransactions} total
+                  Showing first 100 transactions of {filteredTransactions.length} filtered results
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
 
@@ -566,8 +754,6 @@ interface TransactionRowProps {
   rawTimestamp: string;
   amountDisplay: string;
   token: string;
-  feeDisplay: string;
-  status: string;
 }
 
 function TransactionRow({
@@ -576,8 +762,6 @@ function TransactionRow({
   rawTimestamp,
   amountDisplay,
   token,
-  feeDisplay,
-  status,
 }: TransactionRowProps) {
   const shortHash =
     txHash && txHash.length > 18
@@ -615,20 +799,6 @@ function TransactionRow({
       <td className="px-6 py-4 whitespace-nowrap">
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
           {token || "Unknown"}
-        </span>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm text-gray-900">{feeDisplay}</div>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            status === "SUCCESS"
-              ? "bg-green-100 text-green-800"
-              : "bg-red-100 text-red-800"
-          }`}
-        >
-          {status}
         </span>
       </td>
     </tr>
