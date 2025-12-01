@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { EditCryptoTransactionAnalyticsName } from "./components/EditName.js";
 import { CsvUploader } from "./components/CsvUploader.js";
+import { EtherscanUploader } from "./components/EtherscanUploader.js";
 import type { ParsedTransaction } from "./components/CsvUploader.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { useSelectedCryptoTransactionAnalyticsDocument } from "../../document-models/crypto-transaction-analytics/index.js";
@@ -34,10 +35,10 @@ function SortableHeader({
   );
 }
 const TRACKED_ADDRESS =
-  // import.meta.env.VITE_TRACKED_ETH_ADDRESS?.toLowerCase() ||
+  import.meta.env.VITE_TRACKED_ETH_ADDRESS?.toLowerCase() ||
   "0x0000000000000000000000000000000000000000";
 const EXCLUDED_CONTRACT =
-  // import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
+  import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
   "0x0000000000000000000000000000000000000000";
 
 interface DocumentTransaction {
@@ -78,6 +79,9 @@ function EditorContent() {
   >(null);
   const [sortField, setSortField] = useState<SortField>("timestamp");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [activeUploadTab, setActiveUploadTab] = useState<"csv" | "etherscan">(
+    "csv",
+  );
 
   // Filter states
   const [tokenFilter, setTokenFilter] = useState<string>("");
@@ -210,7 +214,7 @@ function EditorContent() {
       return [];
     }
 
-    return previewRows.filter(tx => {
+    return previewRows.filter((tx) => {
       // Token filter
       if (tokenFilter && tx.token !== tokenFilter) {
         return false;
@@ -243,7 +247,7 @@ function EditorContent() {
       // Month filter
       if (monthFilter && tx.timestamp) {
         const txDate = new Date(tx.timestamp);
-        const txMonth = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+        const txMonth = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, "0")}`;
         if (txMonth !== monthFilter) {
           return false;
         }
@@ -318,7 +322,7 @@ function EditorContent() {
 
             {/* Success Message */}
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              CSV Upload Successful!
+              Transaction Upload Successful!
             </h2>
 
             {/* Transaction Count */}
@@ -442,34 +446,49 @@ function EditorContent() {
                   </div>
                   <div className="grid grid-cols-6 gap-6">
                     {monthlyAnalytics.map((month) => (
-                      <div key={month.month} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                      <div
+                        key={month.month}
+                        className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+                      >
                         <div className="font-semibold text-gray-800 mb-4 text-center text-sm">
                           {month.month}
                         </div>
                         <div className="space-y-3">
                           <div className="bg-green-50 p-3 rounded-md">
-                            <div className="text-xs text-green-700 font-medium mb-1">Income</div>
+                            <div className="text-xs text-green-700 font-medium mb-1">
+                              Income
+                            </div>
                             <div className="text-green-600 font-bold text-lg">
-                              +{month.income.toLocaleString(undefined, {
+                              +
+                              {month.income.toLocaleString(undefined, {
                                 minimumFractionDigits: 0,
                                 maximumFractionDigits: 1,
                               })}
                             </div>
                           </div>
                           <div className="bg-red-50 p-3 rounded-md">
-                            <div className="text-xs text-red-700 font-medium mb-1">Expense</div>
+                            <div className="text-xs text-red-700 font-medium mb-1">
+                              Expense
+                            </div>
                             <div className="text-red-600 font-bold text-lg">
-                              -{month.expense.toLocaleString(undefined, {
+                              -
+                              {month.expense.toLocaleString(undefined, {
                                 minimumFractionDigits: 0,
                                 maximumFractionDigits: 1,
                               })}
                             </div>
                           </div>
-                          <div className={`${month.net >= 0 ? "bg-green-50" : "bg-red-50"} p-3 rounded-md border-2 ${month.net >= 0 ? "border-green-200" : "border-red-200"}`}>
-                            <div className="text-xs text-gray-700 font-medium mb-1">Net Total</div>
+                          <div
+                            className={`${month.net >= 0 ? "bg-green-50" : "bg-red-50"} p-3 rounded-md border-2 ${month.net >= 0 ? "border-green-200" : "border-red-200"}`}
+                          >
+                            <div className="text-xs text-gray-700 font-medium mb-1">
+                              Net Total
+                            </div>
                             <div
                               className={`font-bold text-xl ${
-                                month.net >= 0 ? "text-green-600" : "text-red-600"
+                                month.net >= 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
                               }`}
                             >
                               {month.net >= 0 ? "+" : ""}
@@ -496,7 +515,8 @@ function EditorContent() {
                 Imported Transactions
               </h3>
               <div className="text-sm text-gray-600">
-                Showing {filteredTransactions.length} of {totalTransactions} transactions
+                Showing {filteredTransactions.length} of {totalTransactions}{" "}
+                transactions
               </div>
             </div>
 
@@ -513,8 +533,14 @@ function EditorContent() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">All Tokens</option>
-                    {Array.from(new Set(previewRows.map(tx => tx.token).filter(Boolean))).map(token => (
-                      <option key={token} value={token}>{token}</option>
+                    {Array.from(
+                      new Set(
+                        previewRows.map((tx) => tx.token).filter(Boolean),
+                      ),
+                    ).map((token) => (
+                      <option key={token} value={token}>
+                        {token}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -529,9 +555,17 @@ function EditorContent() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">All Contracts</option>
-                    {Array.from(new Set(previewRows.map(tx => tx.contractAddress).filter(Boolean))).map(contract => (
+                    {Array.from(
+                      new Set(
+                        previewRows
+                          .map((tx) => tx.contractAddress)
+                          .filter(Boolean),
+                      ),
+                    ).map((contract) => (
                       <option key={contract} value={contract}>
-                        {contract.length > 16 ? `${contract.substring(0, 8)}...${contract.substring(contract.length - 6)}` : contract}
+                        {contract.length > 16
+                          ? `${contract.substring(0, 8)}...${contract.substring(contract.length - 6)}`
+                          : contract}
                       </option>
                     ))}
                   </select>
@@ -573,21 +607,34 @@ function EditorContent() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">All Months</option>
-                    {Array.from(new Set(
-                      previewRows
-                        .filter(tx => tx.timestamp)
-                        .map(tx => {
-                          const date = new Date(tx.timestamp!);
-                          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                        })
-                    )).sort().reverse().map(month => {
-                      const [year, monthNum] = month.split('-');
-                      const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-                      const displayName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                      return (
-                        <option key={month} value={month}>{displayName}</option>
-                      );
-                    })}
+                    {Array.from(
+                      new Set(
+                        previewRows
+                          .filter((tx) => tx.timestamp)
+                          .map((tx) => {
+                            const date = new Date(tx.timestamp!);
+                            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+                          }),
+                      ),
+                    )
+                      .sort()
+                      .reverse()
+                      .map((month) => {
+                        const [year, monthNum] = month.split("-");
+                        const date = new Date(
+                          parseInt(year),
+                          parseInt(monthNum) - 1,
+                        );
+                        const displayName = date.toLocaleDateString("en-US", {
+                          month: "long",
+                          year: "numeric",
+                        });
+                        return (
+                          <option key={month} value={month}>
+                            {displayName}
+                          </option>
+                        );
+                      })}
                   </select>
                 </div>
 
@@ -611,57 +658,72 @@ function EditorContent() {
             {filteredTransactions.length === 0 ? (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
                 <div className="text-yellow-600 mb-2">
-                  <svg className="mx-auto h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                  <svg
+                    className="mx-auto h-8 w-8"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 18.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
                   </svg>
                 </div>
-                <p className="text-sm text-yellow-800 font-medium">No transactions match your filters</p>
-                <p className="text-xs text-yellow-700 mt-1">Try adjusting your filter criteria or clearing all filters</p>
+                <p className="text-sm text-yellow-800 font-medium">
+                  No transactions match your filters
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Try adjusting your filter criteria or clearing all filters
+                </p>
               </div>
             ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 bg-white shadow rounded-lg">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Transaction Hash
-                    </th>
-                    <SortableHeader
-                      label="Date/Time"
-                      onClick={() => handleSort("timestamp")}
-                      isActive={sortField === "timestamp"}
-                      direction={sortDirection}
-                    />
-                    <SortableHeader
-                      label="Amount"
-                      onClick={() => handleSort("amount")}
-                      isActive={sortField === "amount"}
-                      direction={sortDirection}
-                    />
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Token
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedTransactions.slice(0, 100).map((tx) => (
-                    <TransactionRow
-                      key={tx.id}
-                      txHash={tx.txHash}
-                      timestamp={tx.timestamp}
-                      rawTimestamp={tx.rawTimestamp}
-                      amountDisplay={tx.amountDisplay}
-                      token={tx.token}
-                    />
-                  ))}
-                </tbody>
-              </table>
-              {filteredTransactions.length > 100 && (
-                <div className="px-6 py-3 bg-gray-50 text-sm text-gray-500 text-center">
-                  Showing first 100 transactions of {filteredTransactions.length} filtered results
-                </div>
-              )}
-            </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 bg-white shadow rounded-lg">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Transaction Hash
+                      </th>
+                      <SortableHeader
+                        label="Date/Time"
+                        onClick={() => handleSort("timestamp")}
+                        isActive={sortField === "timestamp"}
+                        direction={sortDirection}
+                      />
+                      <SortableHeader
+                        label="Amount"
+                        onClick={() => handleSort("amount")}
+                        isActive={sortField === "amount"}
+                        direction={sortDirection}
+                      />
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Token
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {sortedTransactions.slice(0, 100).map((tx) => (
+                      <TransactionRow
+                        key={tx.id}
+                        txHash={tx.txHash}
+                        timestamp={tx.timestamp}
+                        rawTimestamp={tx.rawTimestamp}
+                        amountDisplay={tx.amountDisplay}
+                        token={tx.token}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+                {filteredTransactions.length > 100 && (
+                  <div className="px-6 py-3 bg-gray-50 text-sm text-gray-500 text-center">
+                    Showing first 100 transactions of{" "}
+                    {filteredTransactions.length} filtered results
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -731,17 +793,57 @@ function EditorContent() {
       <EditCryptoTransactionAnalyticsName />
 
       <div className="mt-8">
-        {/* CSV Upload Section */}
+        {/* Import Transactions Section */}
         <section>
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             Import Transactions
           </h3>
-          <CsvUploader
-            onUploadSuccess={(data) => {
-              setUploadSuccess(data);
-              setPreviewTransactions(data.transactions);
-            }}
-          />
+
+          {/* Tab Navigation */}
+          <div className="border-b border-gray-200 mb-6">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveUploadTab("csv")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeUploadTab === "csv"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                Upload CSV File
+              </button>
+              <button
+                onClick={() => setActiveUploadTab("etherscan")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeUploadTab === "etherscan"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                Fetch from Etherscan
+              </button>
+            </nav>
+          </div>
+
+          {/* Tab Content */}
+          <div className="tab-content">
+            {activeUploadTab === "csv" && (
+              <CsvUploader
+                onUploadSuccess={(data) => {
+                  setUploadSuccess(data);
+                  setPreviewTransactions(data.transactions);
+                }}
+              />
+            )}
+            {activeUploadTab === "etherscan" && (
+              <EtherscanUploader
+                onUploadSuccess={(data) => {
+                  setUploadSuccess(data);
+                  setPreviewTransactions(data.transactions);
+                }}
+              />
+            )}
+          </div>
         </section>
       </div>
     </div>
