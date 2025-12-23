@@ -190,16 +190,47 @@ function EditorContent() {
     }
     const result = buildPreviewAnalytics(previewRows, trackedAddress);
     console.log("DEBUG - tokenAnalytics result:", result);
-    return result;
+    
+    // Filter out tokens with "http" in the name (scams) and zero balances
+    const filtered = result.filter((token) => {
+      const label = token.label?.toLowerCase() || "";
+      const hasHttp = label.includes("http");
+      const hasZeroBalance = token.total === 0;
+      return !hasHttp && !hasZeroBalance;
+    });
+    
+    return filtered;
   }, [shouldShowDataView, previewRows, trackedAddress]);
 
   const trackedTokenSummary = useMemo(
     () =>
       shouldShowDataView && tokenAnalytics.length > 0
-        ? selectTrackedTokenSummary(tokenAnalytics)
+        ? selectTrackedTokenSummary(tokenAnalytics, previewRows)
         : null,
-    [shouldShowDataView, tokenAnalytics],
+    [shouldShowDataView, tokenAnalytics, previewRows],
   );
+
+  // Reorder tokenAnalytics to put selected token first
+  const orderedTokenAnalytics = useMemo(() => {
+    if (!trackedTokenSummary || tokenAnalytics.length === 0) {
+      return tokenAnalytics;
+    }
+    
+    // Find the selected token and move it to the front
+    const selectedIndex = tokenAnalytics.findIndex(
+      (token) => token.key === trackedTokenSummary.key
+    );
+    
+    if (selectedIndex === -1 || selectedIndex === 0) {
+      // Already first or not found, return as is
+      return tokenAnalytics;
+    }
+    
+    // Move selected token to first position
+    const reordered = [...tokenAnalytics];
+    const [selected] = reordered.splice(selectedIndex, 1);
+    return [selected, ...reordered];
+  }, [tokenAnalytics, trackedTokenSummary]);
 
   const balanceTimeline = useMemo(() => {
     if (!shouldShowDataView || !trackedTokenSummary) {
@@ -531,7 +562,7 @@ function EditorContent() {
         )}
 
         {/* Token Analytics */}
-        {tokenAnalytics.length > 0 && (
+        {orderedTokenAnalytics.length > 0 && (
           <div className="mt-8 bg-white shadow rounded-lg border border-gray-100">
             <div className="px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -542,7 +573,7 @@ function EditorContent() {
               </p>
             </div>
             <dl className="grid gap-4 px-6 py-4 sm:grid-cols-2 lg:grid-cols-3">
-              {tokenAnalytics.map((token) => (
+              {orderedTokenAnalytics.map((token) => (
                 <div
                   key={token.key}
                   className="bg-gray-50 rounded-lg p-4 border border-gray-100"
@@ -1166,14 +1197,96 @@ function buildPreviewAnalytics(
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
+/**
+ * Normalizes token symbols to handle variations (case-insensitive, handle GBPe/GBP, etc.)
+ */
+function normalizeTokenSymbol(token: string | null | undefined): string {
+  if (!token) return "";
+  const normalized = token.trim().toUpperCase();
+  // Handle common variations
+  if (normalized === "GBP" || normalized === "GBPE") return "GBPE";
+  if (normalized === "EUR" || normalized === "EURE") return "EURE";
+  if (normalized === "USDC") return "USDC";
+  return normalized;
+}
+
+/**
+ * Checks if a token is a Gnosis Pay supported token (USDC, GBPe, EURe)
+ */
+function isGnosisPayToken(token: string | null | undefined): boolean {
+  const normalized = normalizeTokenSymbol(token);
+  return normalized === "USDC" || normalized === "GBPE" || normalized === "EURE";
+}
+
+/**
+ * Selects the primary token for Gnosis Pay account display.
+ * Prioritizes tokens with the most transactions among USDC, GBPe, and EURe.
+ * Falls back to highest volume if no Gnosis Pay tokens found.
+ */
 function selectTrackedTokenSummary(
   summaries: TokenAnalyticsSummary[],
+  allTransactions: ParsedTransaction[],
 ): TokenAnalyticsSummary | null {
   if (!summaries.length) return null;
-  const gbpSummary =
-    summaries.find((summary) => summary.label?.toLowerCase().includes("gbp")) ||
-    summaries.find((summary) => summary.label?.toUpperCase() === "GBPE");
-  return gbpSummary || summaries[0];
+
+  // Count transactions per Gnosis Pay token
+  const gnosisPayTokenCounts = new Map<string, { count: number; summary: TokenAnalyticsSummary | null }>();
+  
+  // Initialize with supported tokens
+  gnosisPayTokenCounts.set("USDC", { count: 0, summary: null });
+  gnosisPayTokenCounts.set("GBPE", { count: 0, summary: null });
+  gnosisPayTokenCounts.set("EURE", { count: 0, summary: null });
+
+  // Count transactions for each Gnosis Pay token
+  allTransactions.forEach((tx) => {
+    const normalizedToken = normalizeTokenSymbol(tx.token);
+    if (isGnosisPayToken(normalizedToken)) {
+      const entry = gnosisPayTokenCounts.get(normalizedToken);
+      if (entry) {
+        entry.count += 1;
+        // Find matching summary if not already set
+        // Match by label or by contract address (if summary key matches tx contractAddress)
+        if (!entry.summary) {
+          entry.summary = summaries.find((s) => {
+            const summaryToken = normalizeTokenSymbol(s.label);
+            const summaryKey = s.key.toLowerCase();
+            const txContract = tx.contractAddress?.toLowerCase() || "";
+            return (
+              summaryToken === normalizedToken ||
+              (txContract && summaryKey === txContract)
+            );
+          }) || null;
+        }
+      }
+    }
+  });
+
+  // Find the token with the most transactions
+  let maxCount = -1;
+  let selectedSummary: TokenAnalyticsSummary | null = null;
+
+  gnosisPayTokenCounts.forEach((entry) => {
+    if (entry.count > maxCount && entry.summary) {
+      maxCount = entry.count;
+      selectedSummary = entry.summary;
+    }
+  });
+
+  // If we found a Gnosis Pay token with transactions, use it
+  if (selectedSummary) {
+    return selectedSummary;
+  }
+
+  // Fallback: Check if any summary matches Gnosis Pay tokens (by label)
+  const gnosisPaySummary = summaries.find((summary) =>
+    isGnosisPayToken(summary.label)
+  );
+  if (gnosisPaySummary) {
+    return gnosisPaySummary;
+  }
+
+  // Final fallback: return the summary with highest total (original behavior)
+  return summaries[0];
 }
 
 function buildPreviewBalanceTimeline(
@@ -1182,11 +1295,23 @@ function buildPreviewBalanceTimeline(
   tokenSummary: TokenAnalyticsSummary,
 ): BalancePoint[] {
   if (!tokenSummary) return [];
-  const sorted = [...rows].sort(
-    (a, b) =>
-      (a.timestamp ? Date.parse(a.timestamp) : 0) -
-      (b.timestamp ? Date.parse(b.timestamp) : 0),
-  );
+  
+  const today = new Date();
+  today.setHours(23, 59, 59, 999); // End of today
+  const todayTimestamp = today.getTime();
+  
+  // Filter and sort transactions - only include up to today
+  const sorted = [...rows]
+    .filter((tx) => {
+      if (!tx.timestamp) return false;
+      const txTimestamp = Date.parse(tx.timestamp);
+      return !isNaN(txTimestamp) && txTimestamp <= todayTimestamp;
+    })
+    .sort(
+      (a, b) =>
+        (a.timestamp ? Date.parse(a.timestamp) : 0) -
+        (b.timestamp ? Date.parse(b.timestamp) : 0),
+    );
 
   const points: BalancePoint[] = [];
   let balance = 0;
@@ -1194,23 +1319,42 @@ function buildPreviewBalanceTimeline(
     ? Date.parse(sorted[0].timestamp || "") || Date.now()
     : Date.now();
 
+  // Start at 0 balance before first transaction
   if (sorted.length) {
-    points.push({ timestamp: referenceTime - 1, balance: 0 });
+    const firstTxTime = Date.parse(sorted[0].timestamp || "");
+    if (!isNaN(firstTxTime) && firstTxTime > 0) {
+      points.push({ timestamp: firstTxTime - 1, balance: 0 });
+    }
   }
 
+  // Process transactions up to today
   sorted.forEach((tx, index) => {
     if (getPreviewTokenKey(tx) !== tokenSummary.key) {
       return;
     }
     const delta = computePreviewDelta(tx, trackedAddress);
     if (delta === 0) return;
-    const timestamp =
-      (tx.timestamp ? Date.parse(tx.timestamp) : referenceTime + index + 1) ||
-      referenceTime + index + 1;
+    const timestamp = tx.timestamp
+      ? Date.parse(tx.timestamp)
+      : referenceTime + index + 1;
+    
+    if (isNaN(timestamp) || timestamp > todayTimestamp) {
+      return; // Skip invalid or future timestamps
+    }
+    
     balance += delta;
     points.push({ timestamp, balance });
     referenceTime = timestamp;
   });
+
+  // Add final point at today to show flat balance
+  if (points.length > 0) {
+    const lastPoint = points[points.length - 1];
+    // Only add today point if it's different from the last transaction point
+    if (lastPoint.timestamp < todayTimestamp) {
+      points.push({ timestamp: todayTimestamp, balance: lastPoint.balance });
+    }
+  }
 
   return points;
 }
@@ -1339,7 +1483,15 @@ function BalanceTimeline({
   const balanceRange = maxBalance - minBalance || 1;
   const uniquePoints = points.length > 1 ? points : [...points, points[0]];
   const firstTimestamp = uniquePoints[0].timestamp;
-  const lastTimestamp = uniquePoints[uniquePoints.length - 1].timestamp;
+  
+  // Cap the last timestamp at today - never show future dates
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  const todayTimestamp = today.getTime();
+  const lastTimestamp = Math.min(
+    uniquePoints[uniquePoints.length - 1].timestamp,
+    todayTimestamp
+  );
   const timeRange = lastTimestamp - firstTimestamp || 1;
 
   const handleMouseMove = (event: React.MouseEvent<SVGElement>) => {
