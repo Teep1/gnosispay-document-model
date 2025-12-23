@@ -7,7 +7,7 @@ import {
 
 const CONTRACTS_TO_EXCLUDE = new Set([
   import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
-  "0x0000000000000000000000000000000000000000",
+    "0x0000000000000000000000000000000000000000",
 ]);
 
 export interface ParsedTransaction {

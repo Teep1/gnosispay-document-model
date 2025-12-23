@@ -1,11 +1,19 @@
 import { useMemo, useState } from "react";
+import { generateId } from "document-model/core";
 import { EditCryptoTransactionAnalyticsName } from "./components/EditName.js";
 import { CsvUploader } from "./components/CsvUploader.js";
 import { EtherscanUploader } from "./components/EtherscanUploader.js";
 import type { ParsedTransaction } from "./components/CsvUploader.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
-import { useSelectedCryptoTransactionAnalyticsDocument } from "../../document-models/crypto-transaction-analytics/index.js";
+import {
+  useSelectedCryptoTransactionAnalyticsDocument,
+  importCsvTransactions,
+} from "../../document-models/crypto-transaction-analytics/index.js";
 import { DocumentToolbar } from "@powerhousedao/design-system/connect";
+import {
+  EtherscanApiService,
+  convertEtherscanToParseTransaction,
+} from "./services/etherscanApi.js";
 
 interface SortableHeaderProps {
   label: string;
@@ -82,6 +90,11 @@ function EditorContent() {
   const [activeUploadTab, setActiveUploadTab] = useState<"csv" | "etherscan">(
     "csv",
   );
+  const [lastEtherscanFetch, setLastEtherscanFetch] = useState<{
+    address: string;
+    apiKey: string;
+    lastBlockNumber: number;
+  } | null>(null);
 
   // Filter states
   const [tokenFilter, setTokenFilter] = useState<string>("");
@@ -291,12 +304,149 @@ function EditorContent() {
     setSortField(field);
   }
 
+  const handleEtherscanRefresh = async () => {
+    if (!lastEtherscanFetch || !dispatch) return;
+
+    try {
+      const etherscanService = new EtherscanApiService(
+        lastEtherscanFetch.apiKey,
+        100,
+      );
+      const etherscanTransactions =
+        await etherscanService.fetchERC20Transactions(
+          lastEtherscanFetch.address,
+          lastEtherscanFetch.lastBlockNumber + 1,
+          "latest",
+        );
+
+      if (etherscanTransactions.length === 0) {
+        alert("No new transactions found since last fetch");
+        return;
+      }
+
+      // Convert and process transactions
+      const parsedTransactions = etherscanTransactions.map((tx) =>
+        convertEtherscanToParseTransaction(tx, lastEtherscanFetch.address),
+      );
+
+      const transactionIds = parsedTransactions.map(() => generateId());
+
+      // Create CSV data
+      const csvHeader =
+        "Transaction Hash,DateTime (UTC),Value_IN(Token),Value_OUT(Token),TxnFee(ETH),TokenSymbol,From,To,ContractAddress,Status";
+      const csvRows = parsedTransactions.map((tx) => {
+        const values = [
+          tx.transactionHash,
+          tx.timestamp || tx.rawTimestamp,
+          tx.amountIn?.toString() || "",
+          tx.amountOut?.toString() || "",
+          tx.feeAmount?.toString() || "",
+          tx.token,
+          tx.fromAddress,
+          tx.toAddress,
+          tx.contractAddress,
+          tx.status,
+        ];
+        return values
+          .map((value) => {
+            if (
+              value.includes(",") ||
+              value.includes('"') ||
+              value.includes("\n")
+            ) {
+              return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+          })
+          .join(",");
+      });
+
+      const csvData = [csvHeader, ...csvRows].join("\n");
+
+      // Dispatch to document
+      dispatch(
+        importCsvTransactions({
+          csvData,
+          timestamp: new Date().toISOString(),
+          transactionIds,
+        }),
+      );
+
+      // Update last block number
+      const newLastBlockNumber = Math.max(
+        ...etherscanTransactions.map((tx) => parseInt(tx.blockNumber)),
+      );
+      setLastEtherscanFetch({
+        ...lastEtherscanFetch,
+        lastBlockNumber: newLastBlockNumber,
+      });
+
+      // Update preview transactions
+      setPreviewTransactions(parsedTransactions);
+      setUploadSuccess({
+        transactionCount: parsedTransactions.length,
+        documentId: document?.header?.id || "unknown",
+        transactions: parsedTransactions,
+      });
+
+      alert(
+        `Successfully added ${parsedTransactions.length} new transactions!`,
+      );
+    } catch (error) {
+      console.error("Refresh error:", error);
+      alert(
+        "Failed to refresh transactions: " +
+          (error instanceof Error ? error.message : "Unknown error"),
+      );
+    }
+  };
+
   // If we have transactions (from upload or existing in document), show the data view
   if (shouldShowDataView) {
     const totalTransactions = previewRows.length;
     return (
       <div className="py-4 px-8 max-w-7xl mx-auto">
         <EditCryptoTransactionAnalyticsName />
+
+        {/* REFRESH BUTTON - ALWAYS VISIBLE AT TOP */}
+        {lastEtherscanFetch && (
+          <div className="mt-8 mb-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-blue-900">
+                    🔄 Refresh Transactions
+                  </h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Fetch new transactions for{" "}
+                    {lastEtherscanFetch.address.substring(0, 6)}...
+                    {lastEtherscanFetch.address.substring(38)} from block{" "}
+                    {lastEtherscanFetch.lastBlockNumber + 1}
+                  </p>
+                </div>
+                <button
+                  onClick={handleEtherscanRefresh}
+                  className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <svg
+                    className="-ml-1 mr-3 h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Refresh Transactions
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Show success message only for fresh uploads */}
         {uploadSuccess && (
@@ -837,9 +987,12 @@ function EditorContent() {
             )}
             {activeUploadTab === "etherscan" && (
               <EtherscanUploader
-                onUploadSuccess={(data) => {
+                onUploadSuccess={(data, fetchData) => {
                   setUploadSuccess(data);
                   setPreviewTransactions(data.transactions);
+                  if (fetchData) {
+                    setLastEtherscanFetch(fetchData);
+                  }
                 }}
               />
             )}

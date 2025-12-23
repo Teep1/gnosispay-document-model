@@ -96,16 +96,19 @@ export class EtherscanApiService {
         // Provide more specific error messages
         let errorMessage = `Etherscan API error: ${data.message}`;
         if (data.result) {
-          errorMessage += ` (${data.result})`;
+          errorMessage += ` (${String(data.result)})`;
         }
 
         // Common error cases
         if (data.message.includes("Invalid API Key")) {
-          errorMessage = "Invalid Etherscan API key. Please check your API key in the .env file.";
+          errorMessage =
+            "Invalid Etherscan API key. Please check your API key in the .env file.";
         } else if (data.message.includes("rate limit")) {
-          errorMessage = "Etherscan API rate limit exceeded. Please wait a moment and try again.";
+          errorMessage =
+            "Etherscan API rate limit exceeded. Please wait a moment and try again.";
         } else if (data.message.includes("Invalid address")) {
-          errorMessage = "Invalid Ethereum address format. Please check the address and try again.";
+          errorMessage =
+            "Invalid Ethereum address format. Please check the address and try again.";
         }
 
         throw new Error(errorMessage);

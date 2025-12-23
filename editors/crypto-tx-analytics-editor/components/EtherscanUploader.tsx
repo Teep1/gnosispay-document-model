@@ -11,11 +11,18 @@ import {
 import type { ParsedTransaction } from "./CsvUploader.js";
 
 interface EtherscanUploaderProps {
-  onUploadSuccess?: (data: {
-    transactionCount: number;
-    documentId: string;
-    transactions: ParsedTransaction[];
-  }) => void;
+  onUploadSuccess?: (
+    data: {
+      transactionCount: number;
+      documentId: string;
+      transactions: ParsedTransaction[];
+    },
+    fetchData?: {
+      address: string;
+      apiKey: string;
+      lastBlockNumber: number;
+    },
+  ) => void;
 }
 
 export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
@@ -23,6 +30,12 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
   const [contractAddress, setContractAddress] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastFetchData, setLastFetchData] = useState<{
+    address: string;
+    apiKey: string;
+    lastBlockNumber: number;
+  } | null>(null);
   const [uploadResult, setUploadResult] = useState<{
     type: "success" | "error";
     message: string;
@@ -40,6 +53,154 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
     console.log("EtherscanUploader - No dispatch function available");
     return null;
   }
+
+  const fetchTransactions = async (
+    address: string,
+    userApiKey: string,
+    startBlock: number = 0,
+    isRefresh: boolean = false,
+  ) => {
+    console.log("Initializing Etherscan API service for Gnosis Chain...");
+    const etherscanService = new EtherscanApiService(userApiKey.trim(), 100); // 100 = Gnosis Chain
+
+    console.log(`Fetching transactions for address: ${address}`);
+    console.log(`Starting from block: ${startBlock}`);
+
+    const etherscanTransactions = await etherscanService.fetchERC20Transactions(
+      address.trim(),
+      startBlock, // Use the provided start block
+      "latest",
+    );
+
+    console.log(
+      `Converting ${etherscanTransactions.length} Etherscan transactions...`,
+    );
+
+    // Convert Etherscan transactions to ParsedTransaction format
+    const parsedTransactions: ParsedTransaction[] = etherscanTransactions.map(
+      (tx) => convertEtherscanToParseTransaction(tx, address.trim()),
+    );
+
+    // Get existing transaction hashes from the document to avoid duplicates
+    const existingTxHashes = new Set(
+      (document?.state?.global?.transactions || []).map((tx: any) => tx.txHash),
+    );
+
+    // Filter out duplicates and any problematic transactions
+    const validTransactions = parsedTransactions.filter((tx) => {
+      // Skip transactions that already exist in the document
+      if (existingTxHashes.has(tx.transactionHash)) {
+        console.log(`Skipping duplicate transaction: ${tx.transactionHash}`);
+        return false;
+      }
+      // Add any other filtering logic similar to CSV upload if needed
+      return true;
+    });
+
+    const duplicateCount = parsedTransactions.length - validTransactions.length;
+    if (duplicateCount > 0) {
+      console.log(`Filtered out ${duplicateCount} duplicate transactions`);
+    }
+
+    console.log(`Processing ${validTransactions.length} valid transactions...`);
+
+    if (validTransactions.length === 0) {
+      if (isRefresh) {
+        setUploadResult({
+          type: "success",
+          message:
+            duplicateCount > 0
+              ? `No new transactions found (${duplicateCount} duplicates filtered)`
+              : "No new transactions found since last fetch",
+        });
+      } else {
+        setUploadResult({
+          type: "error",
+          message:
+            duplicateCount > 0
+              ? `No new transactions to import (${duplicateCount} duplicates filtered)`
+              : "No ERC20 transactions found for this address",
+        });
+      }
+      return { transactions: [], lastBlockNumber: startBlock };
+    }
+
+    // Find the highest block number from the fetched transactions
+    const lastBlockNumber =
+      etherscanTransactions.length > 0
+        ? Math.max(
+            ...etherscanTransactions.map((tx) => parseInt(tx.blockNumber)),
+          )
+        : startBlock;
+
+    // Generate unique IDs for each transaction
+    const transactionIds = validTransactions.map(() => generateId());
+
+    // Create a CSV-like representation for the document model
+    // This maintains compatibility with the existing importCsvTransactions action
+    const csvHeader =
+      "Transaction Hash,DateTime (UTC),Value_IN(Token),Value_OUT(Token),TxnFee(ETH),TokenSymbol,From,To,ContractAddress,Status";
+    const csvRows = validTransactions.map((tx) => {
+      const values = [
+        tx.transactionHash,
+        tx.timestamp || tx.rawTimestamp,
+        tx.amountIn?.toString() || "",
+        tx.amountOut?.toString() || "",
+        tx.feeAmount?.toString() || "",
+        tx.token,
+        tx.fromAddress,
+        tx.toAddress,
+        tx.contractAddress,
+        tx.status,
+      ];
+      // Properly escape CSV values that contain commas or quotes
+      return values
+        .map((value) => {
+          if (
+            value.includes(",") ||
+            value.includes('"') ||
+            value.includes("\n")
+          ) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value;
+        })
+        .join(",");
+    });
+
+    const csvData = [csvHeader, ...csvRows].join("\n");
+
+    // Dispatch the importCsvTransactions action to store data in document state
+    console.log("Dispatching importCsvTransactions action...");
+    console.log(
+      `DEBUG: About to import ${validTransactions.length} transactions. Current document transaction count: ${document?.state?.global?.transactions?.length || 0}`,
+    );
+    dispatch(
+      importCsvTransactions({
+        csvData,
+        timestamp: new Date().toISOString(),
+        transactionIds,
+      }),
+    );
+    console.log("Etherscan data stored in document state");
+
+    if (onUploadSuccess) {
+      onUploadSuccess(
+        {
+          transactionCount: validTransactions.length,
+          documentId: document?.header?.id || "unknown",
+          transactions: validTransactions,
+        },
+        {
+          address: address,
+          apiKey: userApiKey,
+          lastBlockNumber,
+        },
+      );
+    }
+
+    return { transactions: validTransactions, lastBlockNumber };
+  };
 
   const handleAddressSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -72,106 +233,31 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
     setUploadResult(null);
 
     try {
-      console.log("Initializing Etherscan API service for Gnosis Chain...");
-      const etherscanService = new EtherscanApiService(apiKey.trim(), 100); // 100 = Gnosis Chain
-
-      console.log(
-        `Fetching transactions for address: ${contractAddress.trim()}`,
+      const result = await fetchTransactions(
+        contractAddress.trim(),
+        apiKey.trim(),
+        0,
+        false,
       );
-      const etherscanTransactions =
-        await etherscanService.fetchERC20Transactions(contractAddress.trim());
 
-      if (etherscanTransactions.length === 0) {
+      // Always save the fetch data for potential refresh (even if no transactions found)
+      setLastFetchData({
+        address: contractAddress.trim(),
+        apiKey: apiKey.trim(),
+        lastBlockNumber: result.lastBlockNumber,
+      });
+
+      if (result.transactions.length > 0) {
         setUploadResult({
-          type: "error",
-          message: "No ERC20 transactions found for this address",
+          type: "success",
+          message: `Successfully uploaded ${result.transactions.length} transactions`,
         });
-        return;
+
+        // Clear the form after successful upload
+        setContractAddress("");
+        setApiKey("");
       }
-
-      console.log(
-        `Converting ${etherscanTransactions.length} Etherscan transactions...`,
-      );
-
-      // Convert Etherscan transactions to ParsedTransaction format
-      const parsedTransactions: ParsedTransaction[] = etherscanTransactions.map(
-        (tx) => convertEtherscanToParseTransaction(tx, contractAddress.trim()),
-      );
-
-      // Filter out any problematic transactions (same as CSV upload)
-      const validTransactions = parsedTransactions.filter((_tx) => {
-        // Add any filtering logic similar to CSV upload if needed
-        return true; // For now, include all transactions
-      });
-
-      console.log(
-        `Processing ${validTransactions.length} valid transactions...`,
-      );
-
-      // Generate unique IDs for each transaction
-      const transactionIds = validTransactions.map(() => generateId());
-
-      // Create a CSV-like representation for the document model
-      // This maintains compatibility with the existing importCsvTransactions action
-      const csvHeader =
-        "Transaction Hash,DateTime (UTC),Value_IN(Token),Value_OUT(Token),TxnFee(ETH),TokenSymbol,From,To,ContractAddress,Status";
-      const csvRows = validTransactions.map((tx) => {
-        const values = [
-          tx.transactionHash,
-          tx.timestamp || tx.rawTimestamp,
-          tx.amountIn?.toString() || "",
-          tx.amountOut?.toString() || "",
-          tx.feeAmount?.toString() || "",
-          tx.token,
-          tx.fromAddress,
-          tx.toAddress,
-          tx.contractAddress,
-          tx.status,
-        ];
-        // Properly escape CSV values that contain commas or quotes
-        return values
-          .map((value) => {
-            if (
-              value.includes(",") ||
-              value.includes('"') ||
-              value.includes("\n")
-            ) {
-              return `"${value.replace(/"/g, '""')}"`;
-            }
-            return value;
-          })
-          .join(",");
-      });
-
-      const csvData = [csvHeader, ...csvRows].join("\n");
-
-      // Dispatch the importCsvTransactions action to store data in document state
-      console.log("Dispatching importCsvTransactions action...");
-      dispatch(
-        importCsvTransactions({
-          csvData,
-          timestamp: new Date().toISOString(),
-          transactionIds,
-        }),
-      );
-      console.log("Etherscan data stored in document state");
-
-      if (onUploadSuccess) {
-        onUploadSuccess({
-          transactionCount: validTransactions.length,
-          documentId: document?.header?.id || "unknown",
-          transactions: validTransactions,
-        });
-      }
-
-      setUploadResult({
-        type: "success",
-        message: `Successfully uploaded ${validTransactions.length} transactions`,
-      });
-
-      // Clear the form
-      setContractAddress("");
-      setApiKey("");
+      // Note: If no transactions found, the fetchTransactions function already sets the appropriate error message
     } catch (error) {
       console.error("Etherscan fetch error:", error);
       setUploadResult({
@@ -183,6 +269,75 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (!lastFetchData) {
+      setUploadResult({
+        type: "error",
+        message:
+          "No previous fetch data available. Please fetch transactions first.",
+      });
+      return;
+    }
+
+    setIsRefreshing(true);
+    setUploadResult(null);
+
+    // Debug: Log current transaction count before refresh
+    const currentTransactionCount =
+      document?.state?.global?.transactions?.length || 0;
+    console.log(
+      `REFRESH DEBUG: Current transaction count BEFORE refresh: ${currentTransactionCount}`,
+    );
+
+    try {
+      const result = await fetchTransactions(
+        lastFetchData.address,
+        lastFetchData.apiKey,
+        lastFetchData.lastBlockNumber + 1, // Start from next block after last fetch
+        true, // This is a refresh
+      );
+
+      // Update the last block number
+      setLastFetchData({
+        ...lastFetchData,
+        lastBlockNumber: Math.max(
+          result.lastBlockNumber,
+          lastFetchData.lastBlockNumber,
+        ),
+      });
+
+      // Debug: Log transaction count after refresh
+      setTimeout(() => {
+        const newTransactionCount =
+          document?.state?.global?.transactions?.length || 0;
+        console.log(
+          `REFRESH DEBUG: Transaction count AFTER refresh: ${newTransactionCount}`,
+        );
+        console.log(
+          `REFRESH DEBUG: Expected count: ${currentTransactionCount + result.transactions.length}`,
+        );
+      }, 100);
+
+      if (result.transactions.length > 0) {
+        setUploadResult({
+          type: "success",
+          message: `Successfully uploaded ${result.transactions.length} new transactions`,
+        });
+      }
+    } catch (error) {
+      console.error("Etherscan refresh error:", error);
+      setUploadResult({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to refresh transactions from Etherscan",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -207,14 +362,18 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
             Fetch transactions from Etherscan
           </h3>
           <p className="mt-1 text-xs text-gray-500">
-            Enter a Gnosis Chain address to automatically fetch ERC20 transactions
+            Enter a Gnosis Chain address to automatically fetch ERC20
+            transactions
           </p>
         </div>
 
         <form onSubmit={handleAddressSubmit} className="mt-6">
           <div className="flex flex-col gap-4">
             <div>
-              <label htmlFor="api-key" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="api-key"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Etherscan API Key
               </label>
               <input
@@ -228,13 +387,21 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
               />
               <p className="mt-1 text-xs text-gray-500">
                 Get your free API key at{" "}
-                <a href="https://etherscan.io/apis" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500">
+                <a
+                  href="https://etherscan.io/apis"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-500"
+                >
                   etherscan.io/apis
                 </a>
               </p>
             </div>
             <div>
-              <label htmlFor="contract-address" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="contract-address"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Gnosis Chain Address
               </label>
               <input
@@ -249,8 +416,8 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
             </div>
             <button
               type="submit"
-              className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading}
+              className="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || isRefreshing}
             >
               {isLoading ? (
                 <>
@@ -349,12 +516,80 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
         </div>
       )}
 
+      {/* Refresh Section */}
+      {lastFetchData && (
+        <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-medium text-gray-900">
+                Refresh Transactions
+              </h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Fetch new transactions for{" "}
+                {lastFetchData.address.substring(0, 6)}...
+                {lastFetchData.address.substring(38)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || isRefreshing}
+              title={`Refresh from block ${lastFetchData.lastBlockNumber + 1}`}
+            >
+              {isRefreshing ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="-ml-1 mr-2 h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Refresh
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mt-6 text-xs text-gray-500">
         <p className="font-medium">How it works:</p>
         <ul className="mt-1 list-disc list-inside space-y-1">
           <li>Get a free API key from Etherscan</li>
           <li>Enter your Gnosis Chain address</li>
           <li>We fetch all ERC20 token transactions via Etherscan API V2</li>
+          <li>Use the "Refresh" button to fetch only new transactions</li>
           <li>Data is processed and formatted the same as CSV uploads</li>
         </ul>
       </div>
