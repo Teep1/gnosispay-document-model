@@ -86,6 +86,13 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
       (document?.state?.global?.transactions || []).map((tx: any) => tx.txHash),
     );
 
+    // Define excluded contracts
+    const EXCLUDED_CONTRACTS = new Set([
+      import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
+        "0x0000000000000000000000000000000000000000",
+      "0x5cb9073902f2035222b9749f8fb0c9bfe5527108".toLowerCase(),
+    ]);
+
     // Filter out duplicates and any problematic transactions
     const validTransactions = parsedTransactions.filter((tx) => {
       // Skip transactions that already exist in the document
@@ -93,7 +100,16 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
         console.log(`Skipping duplicate transaction: ${tx.transactionHash}`);
         return false;
       }
-      // Add any other filtering logic similar to CSV upload if needed
+      // Filter out excluded contract addresses
+      if (
+        tx.contractAddress &&
+        EXCLUDED_CONTRACTS.has(tx.contractAddress.toLowerCase())
+      ) {
+        console.log(
+          `Skipping transaction with excluded contract: ${tx.contractAddress}`,
+        );
+        return false;
+      }
       return true;
     });
 

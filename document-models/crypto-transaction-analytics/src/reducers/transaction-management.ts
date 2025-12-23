@@ -243,8 +243,18 @@ export const cryptoTransactionAnalyticsTransactionManagementOperations: CryptoTr
           method: method || null,
         };
 
-        transactions.push(transaction);
-        transactionIndex++;
+        // Filter out excluded contract addresses
+        const EXCLUDED_CONTRACTS = new Set([
+          "0x5cb9073902f2035222b9749f8fb0c9bfe5527108".toLowerCase(),
+        ]);
+
+        if (
+          !transaction.contractAddress ||
+          !EXCLUDED_CONTRACTS.has(transaction.contractAddress.toLowerCase())
+        ) {
+          transactions.push(transaction);
+          transactionIndex++;
+        }
       }
 
       state.transactions.push(...transactions);
@@ -273,6 +283,19 @@ export const cryptoTransactionAnalyticsTransactionManagementOperations: CryptoTr
       }
     },
     addTransactionOperation(state, action) {
+      // Filter out excluded contract addresses
+      const EXCLUDED_CONTRACTS = new Set([
+        "0x5cb9073902f2035222b9749f8fb0c9bfe5527108".toLowerCase(),
+      ]);
+
+      if (
+        action.input.contractAddress &&
+        EXCLUDED_CONTRACTS.has(action.input.contractAddress.toLowerCase())
+      ) {
+        // Skip adding transaction with excluded contract address
+        return;
+      }
+
       const transaction = {
         id: action.input.id,
         txHash: action.input.txHash,

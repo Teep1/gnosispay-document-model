@@ -45,9 +45,11 @@ function SortableHeader({
 const TRACKED_ADDRESS =
   import.meta.env.VITE_TRACKED_ETH_ADDRESS?.toLowerCase() ||
   "0x0000000000000000000000000000000000000000";
-const EXCLUDED_CONTRACT =
+const EXCLUDED_CONTRACTS = new Set([
   import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
-  "0x0000000000000000000000000000000000000000";
+    "0x0000000000000000000000000000000000000000",
+  "0x5cb9073902f2035222b9749f8fb0c9bfe5527108".toLowerCase(),
+]);
 
 interface DocumentTransaction {
   id: string;
@@ -329,12 +331,25 @@ function EditorContent() {
         convertEtherscanToParseTransaction(tx, lastEtherscanFetch.address),
       );
 
-      const transactionIds = parsedTransactions.map(() => generateId());
+      // Filter out excluded contract addresses
+      const EXCLUDED_CONTRACTS = new Set([
+        import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
+          "0x0000000000000000000000000000000000000000",
+        "0x5cb9073902f2035222b9749f8fb0c9bfe5527108".toLowerCase(),
+      ]);
+
+      const filteredTransactions = parsedTransactions.filter(
+        (tx) =>
+          !tx.contractAddress ||
+          !EXCLUDED_CONTRACTS.has(tx.contractAddress.toLowerCase()),
+      );
+
+      const transactionIds = filteredTransactions.map(() => generateId());
 
       // Create CSV data
       const csvHeader =
         "Transaction Hash,DateTime (UTC),Value_IN(Token),Value_OUT(Token),TxnFee(ETH),TokenSymbol,From,To,ContractAddress,Status";
-      const csvRows = parsedTransactions.map((tx) => {
+      const csvRows = filteredTransactions.map((tx) => {
         const values = [
           tx.transactionHash,
           tx.timestamp || tx.rawTimestamp,
@@ -382,15 +397,15 @@ function EditorContent() {
       });
 
       // Update preview transactions
-      setPreviewTransactions(parsedTransactions);
+      setPreviewTransactions(filteredTransactions);
       setUploadSuccess({
-        transactionCount: parsedTransactions.length,
+        transactionCount: filteredTransactions.length,
         documentId: document?.header?.id || "unknown",
-        transactions: parsedTransactions,
+        transactions: filteredTransactions,
       });
 
       alert(
-        `Successfully added ${parsedTransactions.length} new transactions!`,
+        `Successfully added ${filteredTransactions.length} new transactions!`,
       );
     } catch (error) {
       console.error("Refresh error:", error);
@@ -1089,7 +1104,7 @@ function filterPreviewTransactions(
   return rows.filter(
     (tx) =>
       !tx.contractAddress ||
-      tx.contractAddress.toLowerCase() !== EXCLUDED_CONTRACT,
+      !EXCLUDED_CONTRACTS.has(tx.contractAddress.toLowerCase()),
   );
 }
 
