@@ -10,6 +10,12 @@ interface TokenValue {
   usdValue?: number | null;
 }
 
+interface MonthlyValue {
+  amount: number;
+  token: string;
+  usdValue?: number | null;
+}
+
 interface FeeAnalysis {
   totalFees: TokenValue | null;
   feesByToken: TokenValue[];
@@ -43,11 +49,11 @@ interface FinancialAnalyticsProps {
   
   // Transaction breakdown
   topTokens: TokenValue[];
-  monthlyBreakdown: TokenValue[];
-  
+  monthlyBreakdown: MonthlyValue[];
+
   // Wallet info
   walletAddress: string;
-  
+
   className?: string;
 }
 
