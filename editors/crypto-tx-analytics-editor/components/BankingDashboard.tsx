@@ -4,7 +4,7 @@ import { QuickActions } from "./QuickActions.js";
 import { TransactionFeed } from "./TransactionFeed.js";
 import { TokenBalances } from "./TokenBalances.js";
 import { BottomNavigation } from "./BottomNavigation.js";
-import type { Transaction } from "../../../../document-models/crypto-transaction-analytics/gen/types.js";
+import type { Transaction } from "../../../document-models/crypto-transaction-analytics/gen/types.js";
 
 type TabId = "home" | "analytics" | "budget" | "settings";
 
