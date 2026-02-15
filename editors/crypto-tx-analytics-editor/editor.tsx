@@ -190,7 +190,7 @@ function EditorContent() {
     }
     const result = buildPreviewAnalytics(previewRows, trackedAddress);
     console.log("DEBUG - tokenAnalytics result:", result);
-    
+
     // Filter out tokens with "http" in the name (scams) and zero balances
     const filtered = result.filter((token) => {
       const label = token.label?.toLowerCase() || "";
@@ -198,7 +198,7 @@ function EditorContent() {
       const hasZeroBalance = token.total === 0;
       return !hasHttp && !hasZeroBalance;
     });
-    
+
     return filtered;
   }, [shouldShowDataView, previewRows, trackedAddress]);
 
@@ -215,17 +215,17 @@ function EditorContent() {
     if (!trackedTokenSummary || tokenAnalytics.length === 0) {
       return tokenAnalytics;
     }
-    
+
     // Find the selected token and move it to the front
     const selectedIndex = tokenAnalytics.findIndex(
-      (token) => token.key === trackedTokenSummary.key
+      (token) => token.key === trackedTokenSummary.key,
     );
-    
+
     if (selectedIndex === -1 || selectedIndex === 0) {
       // Already first or not found, return as is
       return tokenAnalytics;
     }
-    
+
     // Move selected token to first position
     const reordered = [...tokenAnalytics];
     const [selected] = reordered.splice(selectedIndex, 1);
@@ -348,8 +348,10 @@ function EditorContent() {
       const etherscanTransactions =
         await etherscanService.fetchERC20Transactions(
           lastEtherscanFetch.address,
-          lastEtherscanFetch.lastBlockNumber + 1,
-          "latest",
+          {
+            startBlock: lastEtherscanFetch.lastBlockNumber + 1,
+            endBlock: "latest",
+          },
         );
 
       if (etherscanTransactions.length === 0) {
@@ -1215,7 +1217,9 @@ function normalizeTokenSymbol(token: string | null | undefined): string {
  */
 function isGnosisPayToken(token: string | null | undefined): boolean {
   const normalized = normalizeTokenSymbol(token);
-  return normalized === "USDC" || normalized === "GBPE" || normalized === "EURE";
+  return (
+    normalized === "USDC" || normalized === "GBPE" || normalized === "EURE"
+  );
 }
 
 /**
@@ -1230,8 +1234,11 @@ function selectTrackedTokenSummary(
   if (!summaries.length) return null;
 
   // Count transactions per Gnosis Pay token
-  const gnosisPayTokenCounts = new Map<string, { count: number; summary: TokenAnalyticsSummary | null }>();
-  
+  const gnosisPayTokenCounts = new Map<
+    string,
+    { count: number; summary: TokenAnalyticsSummary | null }
+  >();
+
   // Initialize with supported tokens
   gnosisPayTokenCounts.set("USDC", { count: 0, summary: null });
   gnosisPayTokenCounts.set("GBPE", { count: 0, summary: null });
@@ -1247,15 +1254,16 @@ function selectTrackedTokenSummary(
         // Find matching summary if not already set
         // Match by label or by contract address (if summary key matches tx contractAddress)
         if (!entry.summary) {
-          entry.summary = summaries.find((s) => {
-            const summaryToken = normalizeTokenSymbol(s.label);
-            const summaryKey = s.key.toLowerCase();
-            const txContract = tx.contractAddress?.toLowerCase() || "";
-            return (
-              summaryToken === normalizedToken ||
-              (txContract && summaryKey === txContract)
-            );
-          }) || null;
+          entry.summary =
+            summaries.find((s) => {
+              const summaryToken = normalizeTokenSymbol(s.label);
+              const summaryKey = s.key.toLowerCase();
+              const txContract = tx.contractAddress?.toLowerCase() || "";
+              return (
+                summaryToken === normalizedToken ||
+                (txContract && summaryKey === txContract)
+              );
+            }) || null;
         }
       }
     }
@@ -1279,7 +1287,7 @@ function selectTrackedTokenSummary(
 
   // Fallback: Check if any summary matches Gnosis Pay tokens (by label)
   const gnosisPaySummary = summaries.find((summary) =>
-    isGnosisPayToken(summary.label)
+    isGnosisPayToken(summary.label),
   );
   if (gnosisPaySummary) {
     return gnosisPaySummary;
@@ -1295,11 +1303,11 @@ function buildPreviewBalanceTimeline(
   tokenSummary: TokenAnalyticsSummary,
 ): BalancePoint[] {
   if (!tokenSummary) return [];
-  
+
   const today = new Date();
   today.setHours(23, 59, 59, 999); // End of today
   const todayTimestamp = today.getTime();
-  
+
   // Filter and sort transactions - only include up to today
   const sorted = [...rows]
     .filter((tx) => {
@@ -1337,11 +1345,11 @@ function buildPreviewBalanceTimeline(
     const timestamp = tx.timestamp
       ? Date.parse(tx.timestamp)
       : referenceTime + index + 1;
-    
+
     if (isNaN(timestamp) || timestamp > todayTimestamp) {
       return; // Skip invalid or future timestamps
     }
-    
+
     balance += delta;
     points.push({ timestamp, balance });
     referenceTime = timestamp;
@@ -1483,14 +1491,14 @@ function BalanceTimeline({
   const balanceRange = maxBalance - minBalance || 1;
   const uniquePoints = points.length > 1 ? points : [...points, points[0]];
   const firstTimestamp = uniquePoints[0].timestamp;
-  
+
   // Cap the last timestamp at today - never show future dates
   const today = new Date();
   today.setHours(23, 59, 59, 999);
   const todayTimestamp = today.getTime();
   const lastTimestamp = Math.min(
     uniquePoints[uniquePoints.length - 1].timestamp,
-    todayTimestamp
+    todayTimestamp,
   );
   const timeRange = lastTimestamp - firstTimestamp || 1;
 

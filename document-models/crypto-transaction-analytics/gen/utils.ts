@@ -24,6 +24,7 @@ export const initialGlobalState: CryptoTransactionAnalyticsGlobalState = {
   transactions: [],
   analytics: null,
   metadata: null,
+  detectedBaseCurrency: null,
   settings: {
     baseCurrency: "USD",
     lastForexUpdate: null,

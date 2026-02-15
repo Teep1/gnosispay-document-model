@@ -66,7 +66,7 @@ export type AddTransactionInput = {
   historicalPrice?: InputMaybe<PriceInfoInput>;
   id: Scalars["OID"]["input"];
   method?: InputMaybe<Scalars["String"]["input"]>;
-  status: TransactionStatusInput;
+  status: TransactionStatusInput | `${TransactionStatusInput}`;
   timestamp: Scalars["DateTime"]["input"];
   toAddress?: InputMaybe<Scalars["String"]["input"]>;
   txHash: Scalars["String"]["input"];
@@ -93,6 +93,7 @@ export type ConvertTransactionValuesInput = {
 
 export type CryptoTransactionAnalyticsState = {
   analytics: Maybe<Analytics>;
+  detectedBaseCurrency: Maybe<DetectedBaseCurrency>;
   metadata: Maybe<TransactionMetadata>;
   settings: Settings;
   transactions: Array<Transaction>;
@@ -105,6 +106,15 @@ export type DateRange = {
 
 export type DeleteTransactionInput = {
   id: Scalars["OID"]["input"];
+};
+
+export type DetectedBaseCurrency = {
+  confidence: Scalars["Float"]["output"];
+  currencyCode: Scalars["String"]["output"];
+  reason: Scalars["String"]["output"];
+  stablecoin: Scalars["String"]["output"];
+  totalVolume: VolumeCounts;
+  transactionCounts: TransactionCounts;
 };
 
 export type ExchangeRate = {
@@ -169,13 +179,19 @@ export type Transaction = {
   historicalPrice: Maybe<PriceInfo>;
   id: Scalars["OID"]["output"];
   method: Maybe<Scalars["String"]["output"]>;
-  status: TransactionStatus;
+  status: TransactionStatus | `${TransactionStatus}`;
   timestamp: Scalars["DateTime"]["output"];
   toAddress: Maybe<Scalars["String"]["output"]>;
   txHash: Scalars["String"]["output"];
   txnFee: TokenValue;
   valueIn: Maybe<TokenValue>;
   valueOut: Maybe<TokenValue>;
+};
+
+export type TransactionCounts = {
+  EURe: Scalars["Int"]["output"];
+  GBPe: Scalars["Int"]["output"];
+  USDC: Scalars["Int"]["output"];
 };
 
 export type TransactionMetadata = {
@@ -203,11 +219,17 @@ export type UpdateTransactionInput = {
   historicalPrice?: InputMaybe<PriceInfoInput>;
   id: Scalars["OID"]["input"];
   method?: InputMaybe<Scalars["String"]["input"]>;
-  status?: InputMaybe<TransactionStatus>;
+  status?: InputMaybe<TransactionStatus | `${TransactionStatus}`>;
   timestamp?: InputMaybe<Scalars["DateTime"]["input"]>;
   toAddress?: InputMaybe<Scalars["String"]["input"]>;
   txHash?: InputMaybe<Scalars["String"]["input"]>;
   txnFee?: InputMaybe<TokenValueInput>;
   valueIn?: InputMaybe<TokenValueInput>;
   valueOut?: InputMaybe<TokenValueInput>;
+};
+
+export type VolumeCounts = {
+  EURe: Scalars["Float"]["output"];
+  GBPe: Scalars["Float"]["output"];
+  USDC: Scalars["Float"]["output"];
 };

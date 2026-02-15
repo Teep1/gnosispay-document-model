@@ -7,6 +7,7 @@ import type {
   CryptoTransactionAnalyticsState,
   DateRange,
   DeleteTransactionInput,
+  DetectedBaseCurrency,
   ExchangeRate,
   ExchangeRateInput,
   ImportCsvTransactionsInput,
@@ -17,11 +18,13 @@ import type {
   TokenValue,
   TokenValueInput,
   Transaction,
+  TransactionCounts,
   TransactionMetadata,
   TransactionStatus,
   TransactionStatusInput,
   UpdateExchangeRatesInput,
   UpdateTransactionInput,
+  VolumeCounts,
 } from "./types.js";
 
 type Properties<T> = Required<{
@@ -97,6 +100,7 @@ export function CryptoTransactionAnalyticsStateSchema(): z.ZodObject<
   return z.object({
     __typename: z.literal("CryptoTransactionAnalyticsState").optional(),
     analytics: AnalyticsSchema().nullable(),
+    detectedBaseCurrency: DetectedBaseCurrencySchema().nullable(),
     metadata: TransactionMetadataSchema().nullable(),
     settings: SettingsSchema(),
     transactions: z.array(TransactionSchema()),
@@ -116,6 +120,20 @@ export function DeleteTransactionInputSchema(): z.ZodObject<
 > {
   return z.object({
     id: z.string(),
+  });
+}
+
+export function DetectedBaseCurrencySchema(): z.ZodObject<
+  Properties<DetectedBaseCurrency>
+> {
+  return z.object({
+    __typename: z.literal("DetectedBaseCurrency").optional(),
+    confidence: z.number(),
+    currencyCode: z.string(),
+    reason: z.string(),
+    stablecoin: z.string(),
+    totalVolume: VolumeCountsSchema(),
+    transactionCounts: TransactionCountsSchema(),
   });
 }
 
@@ -225,6 +243,17 @@ export function TransactionSchema(): z.ZodObject<Properties<Transaction>> {
   });
 }
 
+export function TransactionCountsSchema(): z.ZodObject<
+  Properties<TransactionCounts>
+> {
+  return z.object({
+    __typename: z.literal("TransactionCounts").optional(),
+    EURe: z.number(),
+    GBPe: z.number(),
+    USDC: z.number(),
+  });
+}
+
 export function TransactionMetadataSchema(): z.ZodObject<
   Properties<TransactionMetadata>
 > {
@@ -265,5 +294,14 @@ export function UpdateTransactionInputSchema(): z.ZodObject<
     txnFee: z.lazy(() => TokenValueInputSchema().nullish()),
     valueIn: z.lazy(() => TokenValueInputSchema().nullish()),
     valueOut: z.lazy(() => TokenValueInputSchema().nullish()),
+  });
+}
+
+export function VolumeCountsSchema(): z.ZodObject<Properties<VolumeCounts>> {
+  return z.object({
+    __typename: z.literal("VolumeCounts").optional(),
+    EURe: z.number(),
+    GBPe: z.number(),
+    USDC: z.number(),
   });
 }

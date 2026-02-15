@@ -1,3 +1,24 @@
+import { logger } from "../../../src/utils/logger.js";
+import {
+  etherscanRateLimiter,
+  RateLimitError,
+} from "../../../src/utils/rateLimiter.js";
+import {
+  validateInputOrThrow,
+  etherscanFetchInputSchema,
+  sanitizeEthereumAddress,
+  sanitizeApiKey,
+  type EtherscanFetchInput,
+} from "../../../src/utils/validation.js";
+import {
+  handleError,
+  withRetry,
+  ErrorCategory,
+  ApiError,
+  TimeoutError,
+} from "../../../src/utils/errorHandling.js";
+import { getEnvConfig } from "../../../src/utils/config.js";
+
 export interface EtherscanTransaction {
   blockNumber: string;
   timeStamp: string;
@@ -23,7 +44,7 @@ export interface EtherscanTransaction {
 export interface EtherscanResponse {
   status: string;
   message: string;
-  result: EtherscanTransaction[];
+  result: EtherscanTransaction[] | string;
 }
 
 export interface EtherscanApiError {
@@ -32,94 +53,211 @@ export interface EtherscanApiError {
   result?: string;
 }
 
+export interface FetchTransactionsOptions {
+  startBlock?: number;
+  endBlock?: number | "latest";
+  page?: number;
+  offset?: number;
+  sort?: "asc" | "desc";
+}
+
 export class EtherscanApiService {
   private readonly apiKey: string;
   private readonly baseUrl = "https://api.etherscan.io/v2/api";
   private readonly chainId: number;
+  private readonly timeoutMs: number;
 
   constructor(apiKey: string, chainId: number = 100) {
-    if (!apiKey || apiKey === "YourEtherscanApiKeyHere") {
+    const sanitizedKey = sanitizeApiKey(apiKey);
+
+    // Validate API key
+    if (!sanitizedKey || sanitizedKey === "YourEtherscanApiKeyHere") {
       throw new Error("Valid Etherscan API key is required");
     }
-    this.apiKey = apiKey;
+
+    this.apiKey = sanitizedKey;
     this.chainId = chainId; // Default to Gnosis Chain (100)
+
+    // Get timeout from config
+    try {
+      this.timeoutMs = getEnvConfig().VITE_API_TIMEOUT;
+    } catch {
+      this.timeoutMs = 30000; // Default 30s
+    }
+
+    logger.debug("EtherscanApiService initialized", {
+      chainId,
+      baseUrl: this.baseUrl,
+      timeoutMs: this.timeoutMs,
+    });
   }
 
   /**
    * Fetch ERC20 token transactions for a given address using Etherscan API V2
-   * @param address - The blockchain address to fetch transactions for (supports multiple chains)
-   * @param startBlock - Starting block number (optional)
-   * @param endBlock - Ending block number (optional, defaults to 'latest')
-   * @param page - Page number for pagination (optional, defaults to 1)
-   * @param offset - Number of transactions per page (optional, defaults to 10000, max 10000)
-   * @param sort - Sort order 'asc' or 'desc' (optional, defaults to 'desc')
+   * Includes rate limiting and retry logic
    */
   async fetchERC20Transactions(
     address: string,
-    startBlock = 0,
-    endBlock = "latest",
-    page = 1,
-    offset = 10000,
-    sort: "asc" | "desc" = "desc",
+    options: FetchTransactionsOptions = {},
   ): Promise<EtherscanTransaction[]> {
+    // Validate inputs with defaults
+    const inputData = {
+      address: sanitizeEthereumAddress(address),
+      apiKey: this.apiKey,
+      startBlock: options.startBlock ?? 0,
+      endBlock: options.endBlock ?? ("latest" as const),
+      page: options.page ?? 1,
+      offset: options.offset ?? 10000,
+      sort: options.sort ?? ("desc" as const),
+    };
+
+    const validatedInput = validateInputOrThrow(
+      etherscanFetchInputSchema,
+      inputData,
+      "Etherscan fetch input",
+    );
+
+    // Check rate limit
+    const rateLimitResult = etherscanRateLimiter.checkLimit(address);
+    if (!rateLimitResult.allowed) {
+      throw new RateLimitError(
+        `Rate limit exceeded. Please wait ${Math.ceil(rateLimitResult.retryAfterMs / 1000)} seconds.`,
+      );
+    }
+
+    // Build URL with validated parameters
+    const url = this.buildApiUrl(validatedInput);
+
+    logger.info(`Fetching ERC20 transactions for address: ${address}`);
+    logger.debug("API request details", {
+      chainId: this.chainId,
+      startBlock: validatedInput.startBlock,
+      endBlock: validatedInput.endBlock,
+    });
+
+    // Execute request with retry logic
+    const fetchWithRetry = async (): Promise<EtherscanTransaction[]> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
+      try {
+        const response = await fetch(url.toString(), {
+          signal: controller.signal,
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new ApiError(
+            `HTTP error! status: ${response.status}`,
+            response.status,
+          );
+        }
+
+        const data = (await response.json()) as EtherscanResponse;
+
+        logger.debug("Etherscan API response received", {
+          status: data.status,
+          message: data.message,
+          resultCount: Array.isArray(data.result) ? data.result.length : 0,
+        });
+
+        return this.parseResponse(data, address);
+      } catch (error) {
+        clearTimeout(timeoutId);
+
+        if (error instanceof ApiError) {
+          throw error;
+        }
+
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new TimeoutError(`Request timed out after ${this.timeoutMs}ms`);
+        }
+
+        throw error;
+      }
+    };
+
+    try {
+      const transactions = await withRetry(fetchWithRetry, {
+        maxRetries: 3,
+        baseDelayMs: 1000,
+        retryableCategories: [
+          ErrorCategory.NETWORK,
+          ErrorCategory.TIMEOUT,
+          ErrorCategory.RATE_LIMIT,
+        ],
+      });
+
+      logger.info(`Successfully fetched ${transactions.length} transactions`);
+      return transactions;
+    } catch (error) {
+      const appError = handleError(
+        error,
+        "EtherscanApiService.fetchERC20Transactions",
+      );
+      throw new Error(appError.message);
+    }
+  }
+
+  private buildApiUrl(input: EtherscanFetchInput): URL {
     const url = new URL(this.baseUrl);
     url.searchParams.set("chainid", this.chainId.toString());
     url.searchParams.set("module", "account");
     url.searchParams.set("action", "tokentx");
-    url.searchParams.set("address", address);
-    url.searchParams.set("startblock", startBlock.toString());
-    url.searchParams.set("endblock", endBlock.toString());
-    url.searchParams.set("page", page.toString());
-    url.searchParams.set("offset", offset.toString());
-    url.searchParams.set("sort", sort);
-    url.searchParams.set("apikey", this.apiKey);
+    url.searchParams.set("address", input.address);
+    url.searchParams.set("startblock", input.startBlock.toString());
+    url.searchParams.set("endblock", input.endBlock.toString());
+    url.searchParams.set("page", input.page.toString());
+    url.searchParams.set("offset", input.offset.toString());
+    url.searchParams.set("sort", input.sort);
+    url.searchParams.set("apikey", input.apiKey);
+    return url;
+  }
 
-    try {
-      console.log(`Fetching ERC20 transactions for address: ${address}`);
-      console.log(`API URL: ${url.toString()}`);
-      const response = await fetch(url.toString());
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+  private parseResponse(
+    data: EtherscanResponse,
+    address: string,
+  ): EtherscanTransaction[] {
+    if (data.status === "0") {
+      if (data.message === "No transactions found") {
+        logger.info("No transactions found for this address", { address });
+        return [];
       }
 
-      const data = (await response.json()) as EtherscanResponse;
+      // Provide more specific error messages
+      let errorMessage = `Etherscan API error: ${data.message}`;
 
-      console.log("Etherscan API Response:", data);
-
-      if (data.status === "0") {
-        if (data.message === "No transactions found") {
-          console.log("No transactions found for this address");
-          return [];
-        }
-
-        // Provide more specific error messages
-        let errorMessage = `Etherscan API error: ${data.message}`;
-        if (data.result) {
-          errorMessage += ` (${String(data.result)})`;
-        }
-
-        // Common error cases
-        if (data.message.includes("Invalid API Key")) {
-          errorMessage =
-            "Invalid Etherscan API key. Please check your API key in the .env file.";
-        } else if (data.message.includes("rate limit")) {
-          errorMessage =
-            "Etherscan API rate limit exceeded. Please wait a moment and try again.";
-        } else if (data.message.includes("Invalid address")) {
-          errorMessage =
-            "Invalid Ethereum address format. Please check the address and try again.";
-        }
-
-        throw new Error(errorMessage);
+      if (typeof data.result === "string") {
+        errorMessage += ` (${data.result})`;
+      } else if (data.result) {
+        const resultStr = JSON.stringify(data.result);
+        errorMessage += ` (${resultStr})`;
       }
 
-      console.log(`Successfully fetched ${data.result.length} transactions`);
-      return data.result;
-    } catch (error) {
-      console.error("Error fetching ERC20 transactions:", error);
-      throw error;
+      // Common error cases
+      if (data.message.includes("Invalid API Key")) {
+        errorMessage =
+          "Invalid Etherscan API key. Please check your API key in the .env file.";
+      } else if (data.message.includes("rate limit")) {
+        errorMessage =
+          "Etherscan API rate limit exceeded. Please wait a moment and try again.";
+      } else if (data.message.includes("Invalid address")) {
+        errorMessage =
+          "Invalid Ethereum address format. Please check the address and try again.";
+      }
+
+      throw new ApiError(errorMessage);
     }
+
+    if (!Array.isArray(data.result)) {
+      throw new ApiError("Unexpected response format from Etherscan API");
+    }
+
+    return data.result;
   }
 
   /**
