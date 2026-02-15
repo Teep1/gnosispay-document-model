@@ -19,7 +19,7 @@ import { FinancialAnalytics } from "./components/FinancialAnalytics.js";
 import { detectBaseCurrency } from "../../document-models/crypto-transaction-analytics/src/base-currency-detection.js";
 import type { GnosisPayStablecoin } from "../../document-models/crypto-transaction-analytics/src/base-currency-detection.js";
 import { recalculateAnalytics } from "../../document-models/crypto-transaction-analytics/src/utils.js";
-import type { CryptoTransactionAnalyticsDocument } from "../../document-models/crypto-transaction-analytics/gen/types.js";
+import type { CryptoTransactionAnalyticsDocument, Transaction } from "../../document-models/crypto-transaction-analytics/gen/types.js";
 
 interface SortableHeaderProps {
   label: string;
@@ -574,6 +574,7 @@ function EditorContent() {
           document={document}
           trackedAddress={trackedAddress}
           previewRows={previewRows}
+          dispatch={dispatch}
         />
 
         {/* Token Analytics */}
@@ -1886,14 +1887,16 @@ interface FinancialAnalyticsSectionProps {
   document: CryptoTransactionAnalyticsDocument | undefined;
   trackedAddress: string;
   previewRows: ParsedTransaction[];
+  dispatch: ReturnType<typeof useSelectedCryptoTransactionAnalyticsDocument>[1];
 }
 
 function FinancialAnalyticsSection({
   document,
   trackedAddress,
   previewRows,
+  dispatch,
 }: FinancialAnalyticsSectionProps) {
-  // Get detected base currency from document state
+  // Get detected base currency from document state or detect from transactions
   const detectedCurrency = useMemo(() => {
     const detected = document?.state?.global?.detectedBaseCurrency;
     if (detected) {
@@ -1903,37 +1906,70 @@ function FinancialAnalyticsSection({
         reason: detected.reason,
       };
     }
-    // Fall back to detecting from preview rows
-    const result = detectBaseCurrency(
-      previewRows.map((row) => ({
-        id: row.transactionHash,
-        txHash: row.transactionHash,
-        blockNumber: "",
-        timestamp: row.timestamp || row.rawTimestamp,
-        fromAddress: row.fromAddress,
-        toAddress: row.toAddress,
-        contractAddress: row.contractAddress,
-        valueIn: row.amountIn
-          ? { amount: row.amountIn, token: row.token, usdValue: null }
-          : null,
-        valueOut: row.amountOut
-          ? { amount: row.amountOut, token: row.token, usdValue: null }
-          : null,
-        txnFee: { amount: row.feeAmount || 0, token: row.feeToken || "USD", usdValue: null },
-        historicalPrice: null,
-        currentValue: null,
-        convertedValue: null,
-        status: "SUCCESS" as const,
-        errorCode: null,
-        method: null,
-      })),
-    );
+
+    // Build transaction list from previewRows first, then fall back to document transactions
+    const transactionsToAnalyze: Transaction[] = [];
+
+    // Add preview rows if available
+    if (previewRows.length > 0) {
+      transactionsToAnalyze.push(
+        ...previewRows.map((row) => ({
+          id: row.transactionHash,
+          txHash: row.transactionHash,
+          blockNumber: "",
+          timestamp: row.timestamp || row.rawTimestamp,
+          fromAddress: row.fromAddress,
+          toAddress: row.toAddress,
+          contractAddress: row.contractAddress,
+          valueIn: row.amountIn
+            ? { amount: row.amountIn, token: row.token, usdValue: null }
+            : null,
+          valueOut: row.amountOut
+            ? { amount: row.amountOut, token: row.token, usdValue: null }
+            : null,
+          txnFee: { amount: row.feeAmount || 0, token: row.feeToken || "USD", usdValue: null },
+          historicalPrice: null,
+          currentValue: null,
+          convertedValue: null,
+          status: "SUCCESS" as const,
+          errorCode: null,
+          method: null,
+        }))
+      );
+    }
+
+    // Also include document transactions if available (for saved documents)
+    const docTransactions = document?.state?.global?.transactions ?? [];
+    if (docTransactions.length > 0) {
+      transactionsToAnalyze.push(...docTransactions);
+    }
+
+    // Detect base currency from all available transactions
+    const result = detectBaseCurrency(transactionsToAnalyze);
+
     return {
       currency: result.stablecoin,
       confidence: result.confidence,
       reason: result.reason,
     };
-  }, [document?.state?.global?.detectedBaseCurrency, previewRows]);
+  }, [document?.state?.global?.detectedBaseCurrency, document?.state?.global?.transactions, previewRows]);
+
+  // Persist detected currency to document state when detected but not saved
+  useEffect(() => {
+    if (
+      detectedCurrency.currency &&
+      !document?.state?.global?.detectedBaseCurrency &&
+      dispatch &&
+      (previewRows.length > 0 || (document?.state?.global?.transactions?.length ?? 0) > 0)
+    ) {
+      // Calculate analytics to persist the detected base currency
+      dispatch(
+        calculateAnalytics({
+          baseCurrency: detectedCurrency.currency,
+        })
+      );
+    }
+  }, [detectedCurrency.currency, document?.state?.global?.detectedBaseCurrency, dispatch, previewRows.length, document?.state?.global?.transactions?.length]);
 
   // Get analytics from document state
   const analytics = document?.state?.global?.analytics;
