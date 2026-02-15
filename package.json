@@ -1,6 +1,6 @@
 {
   "name": "gnosis-tx-analytics",
-  "description": "",
+  "description": "Gnosis Pay Transaction Analytics - Track and analyze blockchain transactions with multi-token support",
   "version": "1.0.0",
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -43,6 +43,7 @@
     "build": "npm run tsc && npm run tailwind",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint --config eslint.config.js --cache --cache-strategy content",
     "lint:fix": "npm run lint -- --fix",
     "tsc": "tsc",
@@ -56,7 +57,9 @@
     "service": "ph-cli service",
     "vetra": "ph-cli vetra",
     "service-startup": "bash ./node_modules/@powerhousedao/ph-cli/dist/scripts/service-startup.sh",
-    "service-unstartup": "bash ./node_modules/@powerhousedao/ph-cli/dist/scripts/service-unstartup.sh"
+    "service-unstartup": "bash ./node_modules/@powerhousedao/ph-cli/dist/scripts/service-unstartup.sh",
+    "validate": "npm run lint && npm run test && npm run build",
+    "clean": "rm -rf dist node_modules/.cache"
   },
   "dependencies": {
     "@powerhousedao/builder-tools": "latest",

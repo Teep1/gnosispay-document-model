@@ -68,8 +68,10 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
 
     const etherscanTransactions = await etherscanService.fetchERC20Transactions(
       address.trim(),
-      startBlock, // Use the provided start block
-      "latest",
+      {
+        startBlock,
+        endBlock: "latest",
+      },
     );
 
     console.log(
@@ -82,8 +84,13 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
     );
 
     // Get existing transaction hashes from the document to avoid duplicates
+    interface DocumentTransaction {
+      txHash: string;
+    }
     const existingTxHashes = new Set(
-      (document?.state?.global?.transactions || []).map((tx: any) => tx.txHash),
+      (document?.state?.global?.transactions || []).map(
+        (tx: DocumentTransaction) => tx.txHash,
+      ),
     );
 
     // Define excluded contracts
