@@ -136,11 +136,16 @@ function EditorContent() {
   // Handle Etherscan import
   const handleEtherscanImport = async (address: string, apiKey: string) => {
     const service = new EtherscanApiService(apiKey);
-    const txs = await service.fetchTransactions(address);
-    const converted = txs.map((t) => convertEtherscanToParseTransaction(t, address));
-    
+    const txs = await service.fetchERC20Transactions(address, {
+      startBlock: 0,
+      endBlock: 99999999,
+    });
+    const converted = txs.map((t: import("./services/etherscanApi.js").EtherscanTransaction) =>
+      convertEtherscanToParseTransaction(t, address)
+    );
+
     const csvData = converted
-      .map((t) => {
+      .map((t: import("./components/CsvUploader.js").ParsedTransaction) => {
         const amountIn = t.amountIn ? `${t.amountIn}` : "";
         const amountOut = t.amountOut ? `${t.amountOut}` : "";
         return `${t.transactionHash},${t.rawTimestamp},${amountIn},${amountOut},${t.feeAmount || 0},${t.token},${t.fromAddress},${t.toAddress},1`;
@@ -148,12 +153,12 @@ function EditorContent() {
       .join("\n");
 
     const header = "Transaction Hash,DateTime (UTC),Value_IN,Value_OUT,TxnFee,TokenSymbol,From,To,Status\n";
-    
+
     dispatch?.(
       importCsvTransactions({
         csvData: header + csvData,
         timestamp: new Date().toISOString(),
-        transactionIds: converted.map((t) => t.transactionHash),
+        transactionIds: converted.map((t: import("./components/CsvUploader.js").ParsedTransaction) => t.transactionHash),
       })
     );
 
@@ -269,15 +274,28 @@ function EditorContent() {
 
         {activeUploadTab === "csv" ? (
           <CsvUploader
-            onParsed={(parsed) => {
+            onUploadSuccess={(parsed: {
+              transactionCount: number;
+              documentId: string;
+              transactions: import("./components/CsvUploader.js").ParsedTransaction[];
+            }) => {
               setPreviewTransactions(parsed.transactions);
               handleCsvImport(parsed);
             }}
           />
         ) : (
           <EtherscanUploader
-            onFetch={(address, apiKey) => {
-              handleEtherscanImport(address, apiKey);
+            onUploadSuccess={(
+              parsed: {
+                transactionCount: number;
+                documentId: string;
+                transactions: import("./components/CsvUploader.js").ParsedTransaction[];
+              },
+              fetchData?: { address: string; apiKey: string; lastBlockNumber: number }
+            ) => {
+              if (fetchData) {
+                handleEtherscanImport(fetchData.address, fetchData.apiKey);
+              }
             }}
           />
         )}

@@ -4,7 +4,7 @@ interface TokenBalance {
   token: string;
   amount: number;
   currencyCode: string;
-  color: string;
+  color?: string;
 }
 
 interface TokenBalancesProps {
