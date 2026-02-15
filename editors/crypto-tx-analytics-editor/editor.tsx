@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { generateId } from "document-model/core";
 import { EditCryptoTransactionAnalyticsName } from "./components/EditName.js";
 import { CsvUploader } from "./components/CsvUploader.js";
@@ -8,12 +8,18 @@ import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import {
   useSelectedCryptoTransactionAnalyticsDocument,
   importCsvTransactions,
+  calculateAnalytics,
 } from "../../document-models/crypto-transaction-analytics/index.js";
 import { DocumentToolbar } from "@powerhousedao/design-system/connect";
 import {
   EtherscanApiService,
   convertEtherscanToParseTransaction,
 } from "./services/etherscanApi.js";
+import { FinancialAnalytics } from "./components/FinancialAnalytics.js";
+import { detectBaseCurrency } from "../../document-models/crypto-transaction-analytics/src/base-currency-detection.js";
+import type { GnosisPayStablecoin } from "../../document-models/crypto-transaction-analytics/src/base-currency-detection.js";
+import { recalculateAnalytics } from "../../document-models/crypto-transaction-analytics/src/utils.js";
+import type { CryptoTransactionAnalyticsDocument } from "../../document-models/crypto-transaction-analytics/gen/types.js";
 
 interface SortableHeaderProps {
   label: string;
@@ -563,6 +569,13 @@ function EditorContent() {
           </div>
         )}
 
+        {/* Financial Analytics Dashboard */}
+        <FinancialAnalyticsSection
+          document={document}
+          trackedAddress={trackedAddress}
+          previewRows={previewRows}
+        />
+
         {/* Token Analytics */}
         {orderedTokenAnalytics.length > 0 && (
           <div className="mt-8 bg-white shadow rounded-lg border border-gray-100">
@@ -1030,6 +1043,9 @@ function EditorContent() {
                 onUploadSuccess={(data) => {
                   setUploadSuccess(data);
                   setPreviewTransactions(data.transactions);
+                  // Calculate analytics after successful upload
+                  const baseCurrency = document?.state?.global?.settings?.baseCurrency || "USD";
+                  dispatch?.(calculateAnalytics({ baseCurrency }));
                 }}
               />
             )}
@@ -1041,6 +1057,9 @@ function EditorContent() {
                   if (fetchData) {
                     setLastEtherscanFetch(fetchData);
                   }
+                  // Calculate analytics after successful upload
+                  const baseCurrency = document?.state?.global?.settings?.baseCurrency || "USD";
+                  dispatch?.(calculateAnalytics({ baseCurrency }));
                 }}
               />
             )}
@@ -1860,4 +1879,140 @@ function calculateMonthlyAnalytics(
       const bDate = new Date(Date.parse(`${bMonth} 1, ${bYear}`));
       return aDate.getTime() - bDate.getTime();
     });
+}
+
+// Financial Analytics Section Component
+interface FinancialAnalyticsSectionProps {
+  document: CryptoTransactionAnalyticsDocument | undefined;
+  trackedAddress: string;
+  previewRows: ParsedTransaction[];
+}
+
+function FinancialAnalyticsSection({
+  document,
+  trackedAddress,
+  previewRows,
+}: FinancialAnalyticsSectionProps) {
+  // Get detected base currency from document state
+  const detectedCurrency = useMemo(() => {
+    const detected = document?.state?.global?.detectedBaseCurrency;
+    if (detected) {
+      return {
+        currency: detected.stablecoin as GnosisPayStablecoin,
+        confidence: detected.confidence,
+        reason: detected.reason,
+      };
+    }
+    // Fall back to detecting from preview rows
+    const result = detectBaseCurrency(
+      previewRows.map((row) => ({
+        id: row.transactionHash,
+        txHash: row.transactionHash,
+        blockNumber: "",
+        timestamp: row.timestamp || row.rawTimestamp,
+        fromAddress: row.fromAddress,
+        toAddress: row.toAddress,
+        contractAddress: row.contractAddress,
+        valueIn: row.amountIn
+          ? { amount: row.amountIn, token: row.token, usdValue: null }
+          : null,
+        valueOut: row.amountOut
+          ? { amount: row.amountOut, token: row.token, usdValue: null }
+          : null,
+        txnFee: { amount: row.feeAmount || 0, token: row.feeToken || "USD", usdValue: null },
+        historicalPrice: null,
+        currentValue: null,
+        convertedValue: null,
+        status: "SUCCESS" as const,
+        errorCode: null,
+        method: null,
+      })),
+    );
+    return {
+      currency: result.stablecoin,
+      confidence: result.confidence,
+      reason: result.reason,
+    };
+  }, [document?.state?.global?.detectedBaseCurrency, previewRows]);
+
+  // Get analytics from document state
+  const analytics = document?.state?.global?.analytics;
+
+  // Calculate metrics from preview rows as fallback
+  const calculatedMetrics = useMemo(() => {
+    const baseCurrency = detectedCurrency.currency || "USDC";
+    return recalculateAnalytics(
+      previewRows.map((row) => ({
+        id: row.transactionHash,
+        txHash: row.transactionHash,
+        blockNumber: "",
+        timestamp: row.timestamp || row.rawTimestamp,
+        fromAddress: row.fromAddress,
+        toAddress: row.toAddress,
+        contractAddress: row.contractAddress,
+        valueIn: row.amountIn
+          ? { amount: row.amountIn, token: row.token, usdValue: null }
+          : null,
+        valueOut: row.amountOut
+          ? { amount: row.amountOut, token: row.token, usdValue: null }
+          : null,
+        txnFee: { amount: row.feeAmount || 0, token: row.feeToken || "USD", usdValue: null },
+        historicalPrice: null,
+        currentValue: null,
+        convertedValue: null,
+        status: "SUCCESS" as const,
+        errorCode: null,
+        method: null,
+      })),
+      baseCurrency,
+      document?.state?.global?.userPreferences?.monthlyBudgetLimit,
+      document?.state?.global?.userPreferences?.spendingAlertThreshold,
+    );
+  }, [previewRows, detectedCurrency.currency, document?.state?.global?.userPreferences]);
+
+  // Use persisted analytics if available, otherwise use calculated
+  const totalSpent = analytics?.totalSpent?.amount || calculatedMetrics.totalSpent;
+  const totalAdded = calculatedMetrics.totalAdded;
+  const currentBalance = totalAdded - totalSpent;
+  const thisMonthSpending = analytics?.currentMonthSpending?.amount || calculatedMetrics.currentMonthExpenses;
+  const previousMonthSpending = analytics?.previousMonthSpending?.amount || calculatedMetrics.previousMonthExpenses;
+  const averageDailySpend = analytics?.averageDailySpend?.amount || calculatedMetrics.averageDailySpend;
+  const averageTransaction = analytics?.averageTransaction?.amount || calculatedMetrics.averageTransaction;
+  const daysUntilMonthEnd = analytics?.daysUntilMonthEnd || calculatedMetrics.daysUntilMonthEnd;
+  const projectedMonthSpend = analytics?.projectedMonthSpend?.amount || calculatedMetrics.projectedMonthSpend;
+  const totalFees = analytics?.feeAnalysis?.totalFees?.amount || calculatedMetrics.totalFees;
+  const spendingAlerts = analytics?.spendingAlerts || calculatedMetrics.spendingAlerts;
+
+  // Get top tokens by spending
+  const topTokens =
+    analytics?.transactionsByToken
+      ?.filter((t) => t.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+      .map((t) => ({ amount: t.amount, token: t.token, usdValue: t.usdValue })) || [];
+
+  return (
+    <FinancialAnalytics
+      detectedCurrency={detectedCurrency.currency}
+      currencyConfidence={detectedCurrency.confidence}
+      currencyReason={detectedCurrency.reason}
+      currentBalance={currentBalance}
+      totalAdded={totalAdded}
+      totalSpent={totalSpent}
+      thisMonthSpending={thisMonthSpending}
+      previousMonthSpending={previousMonthSpending}
+      availableToSpend={currentBalance}
+      monthlyBudget={document?.state?.global?.userPreferences?.monthlyBudgetLimit || null}
+      alertThreshold={document?.state?.global?.userPreferences?.spendingAlertThreshold || 80}
+      averageDailySpend={averageDailySpend}
+      averageTransaction={averageTransaction}
+      daysUntilMonthEnd={daysUntilMonthEnd || 0}
+      projectedMonthSpend={projectedMonthSpend}
+      totalFees={totalFees}
+      spendingAlerts={spendingAlerts || []}
+      topTokens={topTokens}
+      walletAddress={trackedAddress}
+      className="mt-8"
+    />
+  );
 }
