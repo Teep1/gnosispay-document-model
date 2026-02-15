@@ -1938,7 +1938,7 @@ function FinancialAnalyticsSection({
   // Get analytics from document state
   const analytics = document?.state?.global?.analytics;
 
-  // Calculate metrics from preview rows as fallback
+  // Calculate metrics from preview rows
   const calculatedMetrics = useMemo(() => {
     const baseCurrency = detectedCurrency.currency || "USDC";
     return recalculateAnalytics(
@@ -1965,23 +1965,23 @@ function FinancialAnalyticsSection({
         method: null,
       })),
       baseCurrency,
-      document?.state?.global?.userPreferences?.monthlyBudgetLimit,
-      document?.state?.global?.userPreferences?.spendingAlertThreshold,
+      undefined, // monthlyBudget - not in current schema
+      undefined, // alertThreshold - not in current schema
     );
-  }, [previewRows, detectedCurrency.currency, document?.state?.global?.userPreferences]);
+  }, [previewRows, detectedCurrency.currency]);
 
   // Use persisted analytics if available, otherwise use calculated
   const totalSpent = analytics?.totalSpent?.amount || calculatedMetrics.totalSpent;
   const totalAdded = calculatedMetrics.totalAdded;
   const currentBalance = totalAdded - totalSpent;
-  const thisMonthSpending = analytics?.currentMonthSpending?.amount || calculatedMetrics.currentMonthExpenses;
-  const previousMonthSpending = analytics?.previousMonthSpending?.amount || calculatedMetrics.previousMonthExpenses;
-  const averageDailySpend = analytics?.averageDailySpend?.amount || calculatedMetrics.averageDailySpend;
-  const averageTransaction = analytics?.averageTransaction?.amount || calculatedMetrics.averageTransaction;
-  const daysUntilMonthEnd = analytics?.daysUntilMonthEnd || calculatedMetrics.daysUntilMonthEnd;
-  const projectedMonthSpend = analytics?.projectedMonthSpend?.amount || calculatedMetrics.projectedMonthSpend;
-  const totalFees = analytics?.feeAnalysis?.totalFees?.amount || calculatedMetrics.totalFees;
-  const spendingAlerts = analytics?.spendingAlerts || calculatedMetrics.spendingAlerts;
+  const thisMonthSpending = calculatedMetrics.currentMonthExpenses;
+  const previousMonthSpending = calculatedMetrics.previousMonthExpenses;
+  const averageDailySpend = calculatedMetrics.averageDailySpend;
+  const averageTransaction = calculatedMetrics.averageTransaction;
+  const daysUntilMonthEnd = calculatedMetrics.daysUntilMonthEnd;
+  const projectedMonthSpend = calculatedMetrics.projectedMonthSpend;
+  const totalFees = calculatedMetrics.totalFees;
+  const spendingAlerts = calculatedMetrics.spendingAlerts;
 
   // Get top tokens by spending
   const topTokens =
@@ -1990,6 +1990,9 @@ function FinancialAnalyticsSection({
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5)
       .map((t) => ({ amount: t.amount, token: t.token, usdValue: t.usdValue })) || [];
+
+  // Monthly breakdown for the chart
+  const monthlyBreakdown = analytics?.monthlyBreakdown || [];
 
   return (
     <FinancialAnalytics
@@ -2002,8 +2005,8 @@ function FinancialAnalyticsSection({
       thisMonthSpending={thisMonthSpending}
       previousMonthSpending={previousMonthSpending}
       availableToSpend={currentBalance}
-      monthlyBudget={document?.state?.global?.userPreferences?.monthlyBudgetLimit || null}
-      alertThreshold={document?.state?.global?.userPreferences?.spendingAlertThreshold || 80}
+      monthlyBudget={null}
+      alertThreshold={80}
       averageDailySpend={averageDailySpend}
       averageTransaction={averageTransaction}
       daysUntilMonthEnd={daysUntilMonthEnd || 0}
@@ -2011,6 +2014,7 @@ function FinancialAnalyticsSection({
       totalFees={totalFees}
       spendingAlerts={spendingAlerts || []}
       topTokens={topTokens}
+      monthlyBreakdown={monthlyBreakdown}
       walletAddress={trackedAddress}
       className="mt-8"
     />
