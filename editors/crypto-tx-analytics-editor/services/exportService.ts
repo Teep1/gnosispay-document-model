@@ -1,4 +1,5 @@
-import type { Transaction } from "../../document-models/crypto-transaction-analytics/gen/types.js";
+import type { Transaction } from "../../../document-models/crypto-transaction-analytics/gen/types.js";
+import { detectCategory } from "../utils/categories.js";
 
 export interface ExportOptions {
   format: "csv" | "json" | "pdf";
@@ -34,7 +35,7 @@ export function exportToCSV(transactions: Transaction[]): string {
       tx.txHash,
       tx.fromAddress || "",
       tx.toAddress || "",
-      tx.category || "other",
+      detectCategory(tx.toAddress) || "other",
       isOutgoing ? "Outgoing" : "Incoming",
       amount?.toString() || "0",
       token || "",
@@ -57,7 +58,7 @@ export function exportToJSON(transactions: Transaction[]): string {
       timestamp: tx.timestamp,
       fromAddress: tx.fromAddress,
       toAddress: tx.toAddress,
-      category: tx.category || "other",
+      category: detectCategory(tx.toAddress) || "other",
       valueIn: tx.valueIn,
       valueOut: tx.valueOut,
       txnFee: tx.txnFee,
@@ -88,7 +89,7 @@ export function generatePDFHTML(transactions: Transaction[], title: string): str
         <tr>
           <td>${date.toLocaleDateString("en-GB")}</td>
           <td>${tx.toAddress?.slice(0, 10)}...</td>
-          <td>${tx.category || "other"}</td>
+          <td>${detectCategory(tx.toAddress) || "other"}</td>
           <td style="color: ${isOutgoing ? "#dc2626" : "#059669"}; text-align: right;">
             ${isOutgoing ? "-" : "+"}${amount?.toFixed(2)} ${token}
           </td>
