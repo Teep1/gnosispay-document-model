@@ -7,6 +7,9 @@ import { SpendingAnalytics } from "./components/SpendingAnalytics.js";
 import { BudgetDashboard } from "./components/BudgetDashboard.js";
 import { TransactionFilters } from "./components/TransactionFilters.js";
 import { ExportModal } from "./components/ExportModal.js";
+import { CardManagement } from "./components/CardManagement.js";
+import { SettingsPanel } from "./components/SettingsPanel.js";
+import { RealTimeSync } from "./components/RealTimeSync.js";
 import { CsvUploader } from "./components/CsvUploader.js";
 import { EtherscanUploader } from "./components/EtherscanUploader.js";
 import {
@@ -241,21 +244,28 @@ function EditorContent() {
               onClick={() => setViewMode("import")}
             />
           </div>
+
+          {/* Real-time Sync */}
+          <div className="mt-6">
+            <RealTimeSync transactions={transactions} />
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
-        <div className="flex gap-2 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex gap-2 bg-white p-1 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
           {[
             { id: "transactions", label: "Transactions" },
             { id: "analytics", label: "Analytics" },
             { id: "budget", label: "Budget" },
+            { id: "cards", label: "Cards" },
+            { id: "settings", label: "Settings" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
                 activeTab === tab.id
                   ? "bg-gray-900 text-white shadow-md"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
@@ -304,6 +314,19 @@ function EditorContent() {
               transactions={transactions}
               baseCurrency={baseCurrency}
               currencyCode={currencyCode}
+            />
+          )}
+
+          {activeTab === "cards" && (
+            <CardManagement />
+          )}
+
+          {activeTab === "settings" && (
+            <SettingsPanel
+              baseCurrency={baseCurrency}
+              onBaseCurrencyChange={(currency) => {
+                dispatch?.(calculateAnalytics({ baseCurrency: currency }));
+              }}
             />
           )}
         </div>
