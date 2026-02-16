@@ -79,6 +79,7 @@ type Transaction {
   fromAddress: String
   toAddress: String
   contractAddress: String
+  category: String
   valueIn: TokenValue
   valueOut: TokenValue
   txnFee: TokenValue!
@@ -109,6 +110,14 @@ type Analytics {
   averageTransaction: TokenValue
   transactionsByToken: [TokenValue!]!
   monthlyBreakdown: [TokenValue!]!
+  spendingByCategory: [CategoryValue!]!
+}
+
+type CategoryValue {
+  category: String!
+  amount: Float!
+  token: String!
+  usdValue: Float
 }
 
 input TokenValueInput {
