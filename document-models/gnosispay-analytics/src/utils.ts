@@ -12,6 +12,8 @@ export function detectBaseCurrencyFromTransactions(
   const counts: Record<string, number> = {};
   const volumes: Record<string, number> = {};
 
+  // NOTE: txnFee is excluded - fee tokens (USD, ETH, XDAI) are not indicative
+  // of the account's base currency and inflate counts artificially
   for (const tx of transactions) {
     // Check valueIn
     if (tx.valueIn?.token) {
@@ -30,34 +32,25 @@ export function detectBaseCurrencyFromTransactions(
         volumes[token] = (volumes[token] || 0) + (tx.valueOut.amount || 0);
       }
     }
-
-    // Check txnFee
-    if (tx.txnFee?.token) {
-      const token = normalizeTokenForDetection(tx.txnFee.token);
-      if (isGnosisPayToken(token)) {
-        counts[token] = (counts[token] || 0) + 1;
-        volumes[token] = (volumes[token] || 0) + (tx.txnFee.amount || 0);
-      }
-    }
   }
 
-  // Find token with most transactions
-  let maxCount = 0;
+  // Primary indicator: volume (can't be inflated by dust/fees)
+  let maxVolume = 0;
   let detectedToken: string | null = null;
 
-  for (const [token, count] of Object.entries(counts)) {
-    if (count > maxCount) {
-      maxCount = count;
+  for (const [token, volume] of Object.entries(volumes)) {
+    if (volume > maxVolume) {
+      maxVolume = volume;
       detectedToken = token;
     }
   }
 
-  // If tie or no transactions, use volume as tiebreaker
+  // Fallback to count if no volume data
   if (!detectedToken) {
-    let maxVolume = 0;
-    for (const [token, volume] of Object.entries(volumes)) {
-      if (volume > maxVolume) {
-        maxVolume = volume;
+    let maxCount = 0;
+    for (const [token, count] of Object.entries(counts)) {
+      if (count > maxCount) {
+        maxCount = count;
         detectedToken = token;
       }
     }

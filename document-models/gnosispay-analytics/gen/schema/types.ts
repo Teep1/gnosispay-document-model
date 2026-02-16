@@ -144,11 +144,10 @@ export type GnosispayAnalyticsState = {
   transactions: Array<Transaction>;
 };
 
-export type ImportCsvTransactionsInput = {
-  csvData: Scalars["String"]["input"];
+export type ImportTransactionsInput = {
   timestamp: Scalars["DateTime"]["input"];
   trackedAddress: Scalars["String"]["input"];
-  transactionIds: Array<Scalars["OID"]["input"]>;
+  transactions: Array<AddTransactionInput>;
 };
 
 export type PriceInfo = {

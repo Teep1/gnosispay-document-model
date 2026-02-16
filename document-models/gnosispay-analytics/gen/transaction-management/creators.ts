@@ -1,31 +1,22 @@
 import { createAction } from "document-model/core";
 import {
-  ImportCsvTransactionsInputSchema,
   AddTransactionInputSchema,
   UpdateTransactionInputSchema,
   DeleteTransactionInputSchema,
+  ImportTransactionsInputSchema,
 } from "../schema/zod.js";
 import type {
-  ImportCsvTransactionsInput,
   AddTransactionInput,
   UpdateTransactionInput,
   DeleteTransactionInput,
+  ImportTransactionsInput,
 } from "../types.js";
 import type {
-  ImportCsvTransactionsAction,
   AddTransactionAction,
   UpdateTransactionAction,
   DeleteTransactionAction,
+  ImportTransactionsAction,
 } from "./actions.js";
-
-export const importCsvTransactions = (input: ImportCsvTransactionsInput) =>
-  createAction<ImportCsvTransactionsAction>(
-    "IMPORT_CSV_TRANSACTIONS",
-    { ...input },
-    undefined,
-    ImportCsvTransactionsInputSchema,
-    "global",
-  );
 
 export const addTransaction = (input: AddTransactionInput) =>
   createAction<AddTransactionAction>(
@@ -51,5 +42,14 @@ export const deleteTransaction = (input: DeleteTransactionInput) =>
     { ...input },
     undefined,
     DeleteTransactionInputSchema,
+    "global",
+  );
+
+export const importTransactions = (input: ImportTransactionsInput) =>
+  createAction<ImportTransactionsAction>(
+    "IMPORT_TRANSACTIONS",
+    { ...input },
+    undefined,
+    ImportTransactionsInputSchema,
     "global",
   );

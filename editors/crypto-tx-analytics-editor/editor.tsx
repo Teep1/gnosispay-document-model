@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { FormattedNumber } from "@powerhousedao/design-system/rwa";
+import { DocumentToolbar } from "@powerhousedao/design-system/connect";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { AccountCard as AccountCardV2 } from "./components/AccountCardV2.js";
 import { TransactionsTable } from "./components/TransactionsTable.js";
@@ -11,21 +11,21 @@ import { CardManagement } from "./components/CardManagement.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { RealTimeSync } from "./components/RealTimeSync.js";
 import { DebugPanel } from "./components/DebugPanel.js";
-import { CsvUploader } from "./components/CsvUploader.js";
 import { EtherscanUploader } from "./components/EtherscanUploader.js";
+import { generateId } from "document-model/core";
 import {
   useSelectedGnosispayAnalyticsDocument,
-  importCsvTransactions,
+  importTransactions,
   calculateAnalytics,
 } from "../../document-models/gnosispay-analytics/index.js";
-import type { ParsedTransaction } from "./components/CsvUploader.js";
-import {
-  EtherscanApiService,
-  convertEtherscanToParseTransaction,
-} from "./services/etherscanApi.js";
+import type { ParsedTransaction } from "./services/etherscanApi.js";
+import type {
+  AddTransactionInput,
+  TransactionStatusInput,
+  TransactionTypeInput,
+} from "../../document-models/gnosispay-analytics/gen/schema/types.js";
 import { recalculateAnalytics } from "../../document-models/gnosispay-analytics/src/utils.js";
 import { detectBaseCurrency } from "../../document-models/gnosispay-analytics/src/base-currency-detection.js";
-import type { EtherscanTransaction } from "./services/etherscanApi.js";
 
 type ViewMode = "dashboard" | "import";
 
@@ -36,6 +36,7 @@ const TRACKED_ADDRESS =
 export default function Editor() {
   return (
     <ErrorBoundary>
+      <DocumentToolbar />
       <EditorContent />
     </ErrorBoundary>
   );
@@ -45,15 +46,11 @@ function EditorContent() {
   const [document, dispatch] = useSelectedGnosispayAnalyticsDocument();
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
   const [activeTab, setActiveTab] = useState("transactions");
-  const [activeUploadTab, setActiveUploadTab] = useState<"csv" | "etherscan">(
-    "csv",
-  );
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const transactions = document?.state?.global?.transactions || [];
   const [filteredTransactions, setFilteredTransactions] =
     useState(transactions);
-  const analytics = document?.state?.global?.analytics;
   const detectedBaseCurrency = document?.state?.global?.detectedBaseCurrency;
 
   // Update filtered transactions when transactions change
@@ -98,60 +95,6 @@ function EditorContent() {
     }
   }, [baseCurrency, detectedBaseCurrency, dispatch, transactions.length]);
 
-  // Handle CSV import
-  const handleCsvImport = (parsed: {
-    transactionCount: number;
-    documentId: string;
-    transactions: ParsedTransaction[];
-  }) => {
-    const csvData = parsed.transactions
-      .map((t) => {
-        const amountIn = t.amountIn ? `${t.amountIn}` : "";
-        const amountOut = t.amountOut ? `${t.amountOut}` : "";
-        return `${t.transactionHash},${t.rawTimestamp},${amountIn},${amountOut},${t.feeAmount || 0},${t.token},${t.fromAddress},${t.toAddress},1`;
-      })
-      .join("\n");
-
-    const header =
-      "Transaction Hash,DateTime (UTC),Value_IN,Value_OUT,TxnFee,TokenSymbol,From,To,Status\n";
-
-    // Derive tracked address from transactions
-    const addressCounts = new Map<string, number>();
-    parsed.transactions.forEach((tx) => {
-      if (tx.fromAddress) {
-        const addr = tx.fromAddress.toLowerCase();
-        addressCounts.set(addr, (addressCounts.get(addr) || 0) + 1);
-      }
-      if (tx.toAddress) {
-        const addr = tx.toAddress.toLowerCase();
-        addressCounts.set(addr, (addressCounts.get(addr) || 0) + 1);
-      }
-    });
-    let trackedAddr = TRACKED_ADDRESS;
-    let maxCount = 0;
-    addressCounts.forEach((count, addr) => {
-      if (count > maxCount) {
-        maxCount = count;
-        trackedAddr = addr;
-      }
-    });
-
-    dispatch?.(
-      importCsvTransactions({
-        csvData: header + csvData,
-        timestamp: new Date().toISOString(),
-        transactionIds: parsed.transactions.map((t) => t.transactionHash),
-        trackedAddress: trackedAddr,
-      }),
-    );
-
-    setTimeout(() => {
-      dispatch?.(calculateAnalytics({ baseCurrency }));
-    }, 100);
-
-    setViewMode("dashboard");
-  };
-
   // Normalize token symbols to GnosisPay format
   const normalizeToken = (token: string): string => {
     const upper = token.toUpperCase();
@@ -161,38 +104,50 @@ function EditorContent() {
     return token;
   };
 
-  // Handle Etherscan import
-  const handleEtherscanImport = async (address: string, apiKey: string) => {
-    const service = new EtherscanApiService(apiKey);
-    const txs = await service.fetchERC20Transactions(address, {
-      startBlock: 0,
-      endBlock: 99999999,
+  // Handle Etherscan import — single dispatch path
+  const handleEtherscanImport = (
+    parsed: ParsedTransaction[],
+    address: string,
+  ) => {
+    const structuredTxs: AddTransactionInput[] = parsed.map((t) => {
+      const normalizedTk = normalizeToken(t.token);
+      const isOutgoing = t.fromAddress?.toLowerCase() === address.toLowerCase();
+      const txType: TransactionTypeInput = t.amountOut
+        ? "EXPENSE"
+        : t.amountIn
+          ? "INCOME"
+          : "NEUTRAL";
+      const signedAmount = isOutgoing ? -(t.amountOut || 0) : t.amountIn || 0;
+
+      return {
+        id: generateId(),
+        txHash: t.transactionHash,
+        blockNumber: "",
+        timestamp: t.rawTimestamp || new Date().toISOString(),
+        fromAddress: t.fromAddress || null,
+        toAddress: t.toAddress || null,
+        contractAddress: null,
+        valueIn: t.amountIn
+          ? { amount: t.amountIn, token: normalizedTk, usdValue: null }
+          : null,
+        valueOut: t.amountOut
+          ? { amount: t.amountOut, token: normalizedTk, usdValue: null }
+          : null,
+        txnFee: {
+          amount: t.feeAmount || 0,
+          token: t.feeToken || "XDAI",
+          usdValue: null,
+        },
+        status: "SUCCESS" as TransactionStatusInput,
+        transactionType: txType,
+        signedAmount,
+      };
     });
-    const converted = txs.map((t: EtherscanTransaction) =>
-      convertEtherscanToParseTransaction(t, address),
-    );
-
-    // Build CSV with token-specific columns for proper detection
-    const csvData = converted
-      .map((t: ParsedTransaction) => {
-        const normalizedToken = normalizeToken(t.token);
-        const amountIn = t.amountIn ? `${t.amountIn}` : "";
-        const amountOut = t.amountOut ? `${t.amountOut}` : "";
-        return `${t.transactionHash},${t.rawTimestamp},${amountIn},${normalizedToken},${amountOut},${normalizedToken},${t.feeAmount || 0},XDAI,${t.fromAddress},${t.toAddress},1`;
-      })
-      .join("\n");
-
-    // Headers with token columns for proper extraction
-    const header =
-      "Transaction Hash,DateTime (UTC),Value_IN,TokenSymbol_IN,Value_OUT,TokenSymbol_OUT,TxnFee,FeeToken,From,To,Status\n";
 
     dispatch?.(
-      importCsvTransactions({
-        csvData: header + csvData,
+      importTransactions({
+        transactions: structuredTxs,
         timestamp: new Date().toISOString(),
-        transactionIds: converted.map(
-          (t: ParsedTransaction) => t.transactionHash,
-        ),
         trackedAddress: address,
       }),
     );
@@ -200,30 +155,34 @@ function EditorContent() {
     // Calculate analytics after import with detected base currency
     setTimeout(() => {
       const result = detectBaseCurrency(
-        converted.map((t: ParsedTransaction) => ({
-          id: t.transactionHash,
-          txHash: t.transactionHash,
+        structuredTxs.map((t) => ({
+          id: t.id,
+          txHash: t.txHash,
           blockNumber: "",
-          timestamp: t.rawTimestamp,
-          fromAddress: t.fromAddress,
-          toAddress: t.toAddress,
-          valueIn: t.amountIn
+          timestamp: t.timestamp,
+          fromAddress: t.fromAddress || "",
+          toAddress: t.toAddress || "",
+          valueIn: t.valueIn
             ? {
-                amount: t.amountIn,
-                token: normalizeToken(t.token),
+                amount: t.valueIn.amount,
+                token: t.valueIn.token,
                 usdValue: null,
               }
             : null,
-          valueOut: t.amountOut
+          valueOut: t.valueOut
             ? {
-                amount: t.amountOut,
-                token: normalizeToken(t.token),
+                amount: t.valueOut.amount,
+                token: t.valueOut.token,
                 usdValue: null,
               }
             : null,
-          txnFee: { amount: t.feeAmount || 0, token: "XDAI", usdValue: null },
-          status: "SUCCESS",
-        })) as any,
+          txnFee: {
+            amount: t.txnFee.amount,
+            token: t.txnFee.token,
+            usdValue: null,
+          },
+          status: "SUCCESS" as const,
+        })) as Parameters<typeof detectBaseCurrency>[0],
       );
       const detectedCurrency = result.stablecoin || "USDC";
       dispatch?.(calculateAnalytics({ baseCurrency: detectedCurrency }));
@@ -265,42 +224,13 @@ function EditorContent() {
         </div>
 
         <div className="max-w-4xl mx-auto px-4 py-6">
-          {/* Upload Tabs */}
-          <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-xl">
-            <button
-              onClick={() => setActiveUploadTab("csv")}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
-                activeUploadTab === "csv"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              CSV File
-            </button>
-            <button
-              onClick={() => setActiveUploadTab("etherscan")}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
-                activeUploadTab === "etherscan"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Etherscan API
-            </button>
-          </div>
-
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            {activeUploadTab === "csv" ? (
-              <CsvUploader onUploadSuccess={handleCsvImport} />
-            ) : (
-              <EtherscanUploader
-                onUploadSuccess={(parsed, fetchData) => {
-                  if (fetchData) {
-                    handleEtherscanImport(fetchData.address, fetchData.apiKey);
-                  }
-                }}
-              />
-            )}
+            <EtherscanUploader
+              trackedAddress={TRACKED_ADDRESS}
+              onUploadSuccess={(parsed, address) => {
+                handleEtherscanImport(parsed, address);
+              }}
+            />
           </div>
         </div>
       </div>

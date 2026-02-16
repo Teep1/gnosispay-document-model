@@ -1,4 +1,3 @@
-import type { Transaction } from "../../gen/schema/types.js";
 import type { GnosispayAnalyticsAnalyticsOperations } from "gnosis-tx-analytics/document-models/gnosispay-analytics";
 
 function normalizeToken(token: string | null | undefined): string {
@@ -117,6 +116,8 @@ export const gnosispayAnalyticsAnalyticsOperations: GnosispayAnalyticsAnalyticsO
         GBPe: 0,
       };
 
+      // NOTE: txnFee is excluded - fee tokens (USD, ETH, XDAI) are not indicative
+      // of the account's base currency and inflate counts artificially
       transactions.forEach((tx) => {
         if (tx.valueIn?.token && isGnosisPayStablecoin(tx.valueIn.token)) {
           const normalized = normalizeToken(tx.valueIn.token);
@@ -134,26 +135,11 @@ export const gnosispayAnalyticsAnalyticsOperations: GnosispayAnalyticsAnalyticsO
             totalVolume[key] += tx.valueOut.amount || 0;
           }
         }
-        if (tx.txnFee?.token && isGnosisPayStablecoin(tx.txnFee.token)) {
-          const normalized = normalizeToken(tx.txnFee.token);
-          if (isGnosisPayStablecoin(normalized)) {
-            const key = normalized as "USDC" | "EURe" | "GBPe";
-            transactionCounts[key]++;
-            totalVolume[key] += tx.txnFee.amount || 0;
-          }
-        }
       });
 
       type StablecoinKey = "USDC" | "EURe" | "GBPe";
-      const entries = Object.entries(transactionCounts) as [
-        StablecoinKey,
-        number,
-      ][];
-      const sortedByCount = entries.sort((a, b) => b[1] - a[1]);
-      const [topByCount, topCount] = sortedByCount[0];
-      const secondByCount = sortedByCount[1]?.[1] || 0;
-      const totalStablecoinTxs = entries.reduce(
-        (sum, [, count]) => sum + count,
+      const totalStablecoinTxs = Object.values(transactionCounts).reduce(
+        (sum, count) => sum + count,
         0,
       );
 
@@ -163,29 +149,52 @@ export const gnosispayAnalyticsAnalyticsOperations: GnosispayAnalyticsAnalyticsO
           EURe: "EUR",
           GBPe: "GBP",
         };
-        let detectedStablecoin: StablecoinKey = topByCount;
-        let reason = `Selected ${topByCount} based on ${topCount} transactions (${Math.round((topCount / totalStablecoinTxs) * 100)}% of stablecoin activity)`;
 
-        if (topCount === secondByCount && secondByCount > 0) {
-          const volumeEntries = Object.entries(totalVolume) as [
+        // Primary indicator: volume (can't be inflated by dust/fees)
+        const volumeEntries = Object.entries(totalVolume) as [
+          StablecoinKey,
+          number,
+        ][];
+        const sortedByVolume = volumeEntries.sort((a, b) => b[1] - a[1]);
+        const [topByVolume, topVol] = sortedByVolume[0];
+        const secondVol = sortedByVolume[1]?.[1] || 0;
+
+        let detectedStablecoin: StablecoinKey = topByVolume;
+        let reason: string;
+
+        // Tiebreaker: use count when volumes are exactly equal
+        if (topVol === secondVol && secondVol > 0) {
+          const countEntries = Object.entries(transactionCounts) as [
             StablecoinKey,
             number,
           ][];
-          const sortedByVolume = volumeEntries.sort((a, b) => b[1] - a[1]);
-          if (sortedByVolume[0][0] !== topByCount) {
-            detectedStablecoin = sortedByVolume[0][0];
-            reason = `Selected based on higher volume (${sortedByVolume[0][1].toFixed(2)} vs ${totalVolume[topByCount].toFixed(2)}) due to transaction count tie`;
+          const sortedByCount = countEntries.sort((a, b) => b[1] - a[1]);
+          if (sortedByCount[0][0] !== topByVolume) {
+            detectedStablecoin = sortedByCount[0][0];
+            reason = `Selected ${sortedByCount[0][0]} based on transaction count (${sortedByCount[0][1]} transactions) due to volume tie`;
           } else {
-            reason = `Selected ${topByCount} based on transaction count (${topCount} transactions, tie broken by volume)`;
+            reason = `Selected ${topByVolume} based on volume (${topVol.toFixed(2)}), confirmed by transaction count`;
           }
+        } else if (topVol > 0) {
+          const totalVol = volumeEntries.reduce((sum, [, vol]) => sum + vol, 0);
+          reason = `Selected ${topByVolume} based on ${topVol.toFixed(2)} volume (${Math.round((topVol / totalVol) * 100)}% of stablecoin volume)`;
+        } else {
+          // No volume, fall back to count
+          const countEntries = Object.entries(transactionCounts) as [
+            StablecoinKey,
+            number,
+          ][];
+          const sortedByCount = countEntries.sort((a, b) => b[1] - a[1]);
+          detectedStablecoin = sortedByCount[0][0];
+          reason = `Selected ${sortedByCount[0][0]} based on ${sortedByCount[0][1]} transactions (no volume data)`;
         }
 
-        const countGap = topCount - secondByCount;
-        const confidenceFromCount = Math.min(
-          countGap / Math.max(topCount, 1),
+        const volumeGap = topVol - secondVol;
+        const confidenceFromVolume = Math.min(
+          volumeGap / Math.max(topVol, 1),
           1,
         );
-        const confidence = 0.6 * confidenceFromCount + 0.4;
+        const confidence = 0.6 * confidenceFromVolume + 0.4;
 
         state.detectedBaseCurrency = {
           stablecoin: detectedStablecoin,

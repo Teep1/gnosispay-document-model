@@ -150,13 +150,6 @@ enum TransactionStatusInput {
 
 # Transaction Management
 
-input ImportCsvTransactionsInput {
-  csvData: String!
-  timestamp: DateTime!
-  transactionIds: [OID!]!
-  trackedAddress: String!
-}
-
 input AddTransactionInput {
   id: OID!
   txHash: String!
@@ -207,6 +200,12 @@ input UpdateTransactionInput {
 
 input DeleteTransactionInput {
   id: OID!
+}
+
+input ImportTransactionsInput {
+  transactions: [AddTransactionInput!]!
+  timestamp: DateTime!
+  trackedAddress: String!
 }
 
 # Currency Management

@@ -283,6 +283,24 @@ export class EtherscanApiService {
   }
 }
 
+export interface ParsedTransaction {
+  transactionHash: string;
+  timestamp: string | null;
+  rawTimestamp: string;
+  contractAddress: string;
+  fromAddress: string;
+  toAddress: string;
+  amountIn: number | null;
+  rawAmountIn: string;
+  amountOut: number | null;
+  rawAmountOut: string;
+  token: string;
+  feeAmount: number | null;
+  rawFee: string;
+  feeToken: string;
+  status: string;
+}
+
 /**
  * Convert Etherscan transaction to the ParsedTransaction format used by the app
  */

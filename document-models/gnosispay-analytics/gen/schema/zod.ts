@@ -11,7 +11,7 @@ import type {
   ExchangeRate,
   ExchangeRateInput,
   GnosispayAnalyticsState,
-  ImportCsvTransactionsInput,
+  ImportTransactionsInput,
   PriceInfo,
   PriceInfoInput,
   SetBaseCurrencyInput,
@@ -182,14 +182,13 @@ export function GnosispayAnalyticsStateSchema(): z.ZodObject<
   });
 }
 
-export function ImportCsvTransactionsInputSchema(): z.ZodObject<
-  Properties<ImportCsvTransactionsInput>
+export function ImportTransactionsInputSchema(): z.ZodObject<
+  Properties<ImportTransactionsInput>
 > {
   return z.object({
-    csvData: z.string(),
     timestamp: z.string().datetime(),
     trackedAddress: z.string(),
-    transactionIds: z.array(z.string()),
+    transactions: z.array(z.lazy(() => AddTransactionInputSchema())),
   });
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import type { Transaction } from "../../../document-models/gnosispay-analytics/gen/types.js";
 import {
   detectCategory,
@@ -25,7 +25,7 @@ export function TransactionFilters({
 
   const categories = Object.keys(categoryConfig) as SpendingCategory[];
 
-  useMemo(() => {
+  useEffect(() => {
     let filtered = transactions;
 
     // Search filter

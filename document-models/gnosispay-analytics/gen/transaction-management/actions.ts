@@ -1,15 +1,11 @@
 import type { Action } from "document-model";
 import type {
-  ImportCsvTransactionsInput,
   AddTransactionInput,
   UpdateTransactionInput,
   DeleteTransactionInput,
+  ImportTransactionsInput,
 } from "../types.js";
 
-export type ImportCsvTransactionsAction = Action & {
-  type: "IMPORT_CSV_TRANSACTIONS";
-  input: ImportCsvTransactionsInput;
-};
 export type AddTransactionAction = Action & {
   type: "ADD_TRANSACTION";
   input: AddTransactionInput;
@@ -22,9 +18,13 @@ export type DeleteTransactionAction = Action & {
   type: "DELETE_TRANSACTION";
   input: DeleteTransactionInput;
 };
+export type ImportTransactionsAction = Action & {
+  type: "IMPORT_TRANSACTIONS";
+  input: ImportTransactionsInput;
+};
 
 export type GnosispayAnalyticsTransactionManagementAction =
-  | ImportCsvTransactionsAction
   | AddTransactionAction
   | UpdateTransactionAction
-  | DeleteTransactionAction;
+  | DeleteTransactionAction
+  | ImportTransactionsAction;

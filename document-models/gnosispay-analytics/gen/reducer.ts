@@ -10,10 +10,10 @@ import { gnosispayAnalyticsCurrencyManagementOperations } from "../src/reducers/
 import { gnosispayAnalyticsAnalyticsOperations } from "../src/reducers/analytics.js";
 
 import {
-  ImportCsvTransactionsInputSchema,
   AddTransactionInputSchema,
   UpdateTransactionInputSchema,
   DeleteTransactionInputSchema,
+  ImportTransactionsInputSchema,
   SetBaseCurrencyInputSchema,
   UpdateExchangeRatesInputSchema,
   ConvertTransactionValuesInputSchema,
@@ -29,18 +29,6 @@ const stateReducer: StateReducer<GnosispayAnalyticsPHState> = (
     return state;
   }
   switch (action.type) {
-    case "IMPORT_CSV_TRANSACTIONS": {
-      ImportCsvTransactionsInputSchema().parse(action.input);
-
-      gnosispayAnalyticsTransactionManagementOperations.importCsvTransactionsOperation(
-        (state as any)[action.scope],
-        action as any,
-        dispatch,
-      );
-
-      break;
-    }
-
     case "ADD_TRANSACTION": {
       AddTransactionInputSchema().parse(action.input);
 
@@ -69,6 +57,18 @@ const stateReducer: StateReducer<GnosispayAnalyticsPHState> = (
       DeleteTransactionInputSchema().parse(action.input);
 
       gnosispayAnalyticsTransactionManagementOperations.deleteTransactionOperation(
+        (state as any)[action.scope],
+        action as any,
+        dispatch,
+      );
+
+      break;
+    }
+
+    case "IMPORT_TRANSACTIONS": {
+      ImportTransactionsInputSchema().parse(action.input);
+
+      gnosispayAnalyticsTransactionManagementOperations.importTransactionsOperation(
         (state as any)[action.scope],
         action as any,
         dispatch,

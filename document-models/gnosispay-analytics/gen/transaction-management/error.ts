@@ -1,17 +1,10 @@
 export type ErrorCode =
-  | "InvalidCsvFormatError"
   | "TransactionNotFoundError"
-  | "DeleteTransactionNotFoundError";
+  | "DeleteTransactionNotFoundError"
+  | "EmptyTransactionsError";
 
 export interface ReducerError {
   errorCode: ErrorCode;
-}
-
-export class InvalidCsvFormatError extends Error implements ReducerError {
-  errorCode = "InvalidCsvFormatError" as ErrorCode;
-  constructor(message = "InvalidCsvFormatError") {
-    super(message);
-  }
 }
 
 export class TransactionNotFoundError extends Error implements ReducerError {
@@ -31,8 +24,15 @@ export class DeleteTransactionNotFoundError
   }
 }
 
+export class EmptyTransactionsError extends Error implements ReducerError {
+  errorCode = "EmptyTransactionsError" as ErrorCode;
+  constructor(message = "EmptyTransactionsError") {
+    super(message);
+  }
+}
+
 export const errors = {
-  ImportCsvTransactions: { InvalidCsvFormatError },
   UpdateTransaction: { TransactionNotFoundError },
   DeleteTransaction: { DeleteTransactionNotFoundError },
+  ImportTransactions: { EmptyTransactionsError },
 };

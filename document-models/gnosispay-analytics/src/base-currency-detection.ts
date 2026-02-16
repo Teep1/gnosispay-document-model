@@ -114,6 +114,8 @@ export function detectBaseCurrency(
   }
 
   // Count transactions and volumes for each stablecoin
+  // NOTE: txnFee is excluded - fee tokens (USD, ETH, XDAI) are not indicative
+  // of the account's base currency and inflate counts artificially
   for (const tx of transactions) {
     // Check valueIn
     if (tx.valueIn?.token && isGnosisPayStablecoin(tx.valueIn.token)) {
@@ -134,64 +136,63 @@ export function detectBaseCurrency(
           tx.valueOut.amount || 0;
       }
     }
-
-    // Check txnFee token (sometimes fees are paid in stablecoins)
-    if (tx.txnFee?.token && isGnosisPayStablecoin(tx.txnFee.token)) {
-      const normalized = normalizeTokenSymbol(tx.txnFee.token);
-      if (isGnosisPayStablecoin(normalized)) {
-        result.transactionCounts[normalized as GnosisPayStablecoin]++;
-        result.totalVolume[normalized as GnosisPayStablecoin] +=
-          tx.txnFee.amount || 0;
-      }
-    }
   }
 
-  // Find the stablecoin with the most transactions
-  const entries = Object.entries(result.transactionCounts) as [
-    GnosisPayStablecoin,
-    number,
-  ][];
-
-  const sortedByCount = entries.sort((a, b) => b[1] - a[1]);
-  const [topByCount, topCount] = sortedByCount[0];
-  const secondByCount = sortedByCount[1]?.[1] || 0;
-
   // If no stablecoin transactions found
-  const totalStablecoinTxs = entries.reduce((sum, [, count]) => sum + count, 0);
+  const totalStablecoinTxs = Object.values(result.transactionCounts).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
   if (totalStablecoinTxs === 0) {
     result.reason = "No Gnosis Pay stablecoin transactions found";
     return result;
   }
 
-  // Determine confidence based on the gap between top and second
-  const countGap = topCount - secondByCount;
-  const confidenceFromCount = Math.min(countGap / Math.max(topCount, 1), 1);
+  // Primary indicator: volume (can't be inflated by dust/fees)
+  const volumeEntries = Object.entries(result.totalVolume) as [
+    GnosisPayStablecoin,
+    number,
+  ][];
+  const sortedByVolume = volumeEntries.sort((a, b) => b[1] - a[1]);
+  const [topByVolume, topVolume] = sortedByVolume[0];
+  const secondVolume = sortedByVolume[1]?.[1] || 0;
 
-  // Set the detected stablecoin
-  result.stablecoin = topByCount;
-  result.currencyCode = getStablecoinCurrencyCode(topByCount);
+  // Set the detected stablecoin based on volume
+  result.stablecoin = topByVolume;
+  result.currencyCode = getStablecoinCurrencyCode(topByVolume);
 
-  // Calculate overall confidence (primarily based on transaction count dominance)
-  result.confidence = 0.6 * confidenceFromCount + 0.4; // Base confidence of 0.4
+  // Determine confidence based on volume dominance
+  const volumeGap = topVolume - secondVolume;
+  const confidenceFromVolume = Math.min(volumeGap / Math.max(topVolume, 1), 1);
+  result.confidence = 0.6 * confidenceFromVolume + 0.4;
 
-  // Set reason based on detection method
-  if (countGap === 0 && secondByCount > 0) {
-    // Tie-breaker: check volume
-    const sortedByVolume = (
-      Object.entries(result.totalVolume) as [GnosisPayStablecoin, number][]
-    ).sort((a, b) => b[1] - a[1]);
-
-    if (sortedByVolume[0][0] !== topByCount) {
-      result.stablecoin = sortedByVolume[0][0];
-      result.currencyCode = getStablecoinCurrencyCode(sortedByVolume[0][0]);
-      result.reason = `Selected based on higher volume (${sortedByVolume[0][1].toFixed(2)} vs ${result.totalVolume[topByCount].toFixed(2)}) due to transaction count tie`;
+  // Tiebreaker: use transaction count when volumes are exactly equal
+  if (topVolume === secondVolume && secondVolume > 0) {
+    const countEntries = Object.entries(result.transactionCounts) as [
+      GnosisPayStablecoin,
+      number,
+    ][];
+    const sortedByCount = countEntries.sort((a, b) => b[1] - a[1]);
+    if (sortedByCount[0][0] !== topByVolume) {
+      result.stablecoin = sortedByCount[0][0];
+      result.currencyCode = getStablecoinCurrencyCode(sortedByCount[0][0]);
+      result.reason = `Selected ${sortedByCount[0][0]} based on transaction count (${sortedByCount[0][1]} transactions) due to volume tie`;
     } else {
-      result.reason = `Selected ${topByCount} based on transaction count (${topCount} transactions, tie broken by volume)`;
+      result.reason = `Selected ${topByVolume} based on volume (${topVolume.toFixed(2)}), confirmed by transaction count`;
     }
+  } else if (topVolume > 0) {
+    const totalVolume = volumeEntries.reduce((sum, [, vol]) => sum + vol, 0);
+    result.reason = `Selected ${topByVolume} based on ${topVolume.toFixed(2)} volume (${Math.round((topVolume / totalVolume) * 100)}% of stablecoin volume)`;
   } else {
-    result.reason = `Selected ${topByCount} based on ${topCount} transactions (${Math.round(
-      (topCount / totalStablecoinTxs) * 100,
-    )}% of stablecoin activity)`;
+    // No volume at all, fall back to count
+    const countEntries = Object.entries(result.transactionCounts) as [
+      GnosisPayStablecoin,
+      number,
+    ][];
+    const sortedByCount = countEntries.sort((a, b) => b[1] - a[1]);
+    result.stablecoin = sortedByCount[0][0];
+    result.currencyCode = getStablecoinCurrencyCode(sortedByCount[0][0]);
+    result.reason = `Selected ${sortedByCount[0][0]} based on ${sortedByCount[0][1]} transactions (no volume data)`;
   }
 
   return result;

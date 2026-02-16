@@ -1,33 +1,24 @@
 import { useState } from "react";
-import { generateId } from "document-model/core";
-import {
-  useSelectedGnosispayAnalyticsDocument,
-  importCsvTransactions,
-} from "gnosis-tx-analytics/document-models/gnosispay-analytics";
 import {
   EtherscanApiService,
   convertEtherscanToParseTransaction,
 } from "../services/etherscanApi.js";
-import type { ParsedTransaction } from "./CsvUploader.js";
+import type { ParsedTransaction } from "../services/etherscanApi.js";
 
 interface EtherscanUploaderProps {
-  onUploadSuccess?: (
-    data: {
-      transactionCount: number;
-      documentId: string;
-      transactions: ParsedTransaction[];
-    },
-    fetchData?: {
-      address: string;
-      apiKey: string;
-      lastBlockNumber: number;
-    },
+  onUploadSuccess: (
+    transactions: ParsedTransaction[],
+    address: string,
+    lastBlockNumber: number,
   ) => void;
+  trackedAddress?: string;
 }
 
-export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
-  const [document, dispatch] = useSelectedGnosispayAnalyticsDocument();
-  const [contractAddress, setContractAddress] = useState("");
+export function EtherscanUploader({
+  onUploadSuccess,
+  trackedAddress,
+}: EtherscanUploaderProps) {
+  const [contractAddress, setContractAddress] = useState(trackedAddress || "");
   const [apiKey, setApiKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -41,30 +32,13 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
     message: string;
   } | null>(null);
 
-  console.log("EtherscanUploader render - document:", document);
-  console.log("EtherscanUploader - document exists:", !!document);
-
-  if (!document) {
-    console.log("EtherscanUploader - No document, returning null");
-    return null;
-  }
-
-  if (!dispatch) {
-    console.log("EtherscanUploader - No dispatch function available");
-    return null;
-  }
-
   const fetchTransactions = async (
     address: string,
     userApiKey: string,
     startBlock: number = 0,
     isRefresh: boolean = false,
   ) => {
-    console.log("Initializing Etherscan API service for Gnosis Chain...");
-    const etherscanService = new EtherscanApiService(userApiKey.trim(), 100); // 100 = Gnosis Chain
-
-    console.log(`Fetching transactions for address: ${address}`);
-    console.log(`Starting from block: ${startBlock}`);
+    const etherscanService = new EtherscanApiService(userApiKey.trim(), 100);
 
     const etherscanTransactions = await etherscanService.fetchERC20Transactions(
       address.trim(),
@@ -74,154 +48,59 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
       },
     );
 
-    console.log(
-      `Converting ${etherscanTransactions.length} Etherscan transactions...`,
-    );
-
-    // Convert Etherscan transactions to ParsedTransaction format
     const parsedTransactions: ParsedTransaction[] = etherscanTransactions.map(
       (tx) => convertEtherscanToParseTransaction(tx, address.trim()),
     );
 
-    // Get existing transaction hashes from the document to avoid duplicates
-    interface DocumentTransaction {
-      txHash: string;
-    }
-    const existingTxHashes = new Set(
-      (document?.state?.global?.transactions || []).map(
-        (tx: DocumentTransaction) => tx.txHash,
-      ),
-    );
-
     // Define excluded contracts
     const EXCLUDED_CONTRACTS = new Set([
-      import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
-        "0x0000000000000000000000000000000000000000",
       "0x5cb9073902f2035222b9749f8fb0c9bfe5527108".toLowerCase(),
     ]);
 
-    // Filter out duplicates and any problematic transactions
+    // Filter out excluded contract addresses
     const validTransactions = parsedTransactions.filter((tx) => {
-      // Skip transactions that already exist in the document
-      if (existingTxHashes.has(tx.transactionHash)) {
-        console.log(`Skipping duplicate transaction: ${tx.transactionHash}`);
-        return false;
-      }
-      // Filter out excluded contract addresses
       if (
         tx.contractAddress &&
         EXCLUDED_CONTRACTS.has(tx.contractAddress.toLowerCase())
       ) {
-        console.log(
-          `Skipping transaction with excluded contract: ${tx.contractAddress}`,
-        );
         return false;
       }
       return true;
     });
 
-    const duplicateCount = parsedTransactions.length - validTransactions.length;
-    if (duplicateCount > 0) {
-      console.log(`Filtered out ${duplicateCount} duplicate transactions`);
-    }
-
-    console.log(`Processing ${validTransactions.length} valid transactions...`);
+    const filteredCount = parsedTransactions.length - validTransactions.length;
 
     if (validTransactions.length === 0) {
       if (isRefresh) {
         setUploadResult({
           type: "success",
           message:
-            duplicateCount > 0
-              ? `No new transactions found (${duplicateCount} duplicates filtered)`
+            filteredCount > 0
+              ? `No new transactions found (${filteredCount} excluded)`
               : "No new transactions found since last fetch",
         });
       } else {
         setUploadResult({
           type: "error",
           message:
-            duplicateCount > 0
-              ? `No new transactions to import (${duplicateCount} duplicates filtered)`
+            filteredCount > 0
+              ? `No transactions to import (${filteredCount} excluded)`
               : "No ERC20 transactions found for this address",
         });
       }
-      return { transactions: [], lastBlockNumber: startBlock };
+      return {
+        transactions: [] as ParsedTransaction[],
+        lastBlockNumber: startBlock,
+      };
     }
 
-    // Find the highest block number from the fetched transactions
+    // Find the highest block number
     const lastBlockNumber =
       etherscanTransactions.length > 0
         ? Math.max(
             ...etherscanTransactions.map((tx) => parseInt(tx.blockNumber)),
           )
         : startBlock;
-
-    // Generate unique IDs for each transaction
-    const transactionIds = validTransactions.map(() => generateId());
-
-    // Create a CSV-like representation for the document model
-    // This maintains compatibility with the existing importCsvTransactions action
-    const csvHeader =
-      "Transaction Hash,DateTime (UTC),Value_IN(Token),Value_OUT(Token),TxnFee(ETH),TokenSymbol,From,To,ContractAddress,Status";
-    const csvRows = validTransactions.map((tx) => {
-      const values = [
-        tx.transactionHash,
-        tx.timestamp || tx.rawTimestamp,
-        tx.amountIn?.toString() || "",
-        tx.amountOut?.toString() || "",
-        tx.feeAmount?.toString() || "",
-        tx.token,
-        tx.fromAddress,
-        tx.toAddress,
-        tx.contractAddress,
-        tx.status,
-      ];
-      // Properly escape CSV values that contain commas or quotes
-      return values
-        .map((value) => {
-          if (
-            value.includes(",") ||
-            value.includes('"') ||
-            value.includes("\n")
-          ) {
-            return `"${value.replace(/"/g, '""')}"`;
-          }
-          return value;
-        })
-        .join(",");
-    });
-
-    const csvData = [csvHeader, ...csvRows].join("\n");
-
-    // Dispatch the importCsvTransactions action to store data in document state
-    console.log("Dispatching importCsvTransactions action...");
-    console.log(
-      `DEBUG: About to import ${validTransactions.length} transactions. Current document transaction count: ${document?.state?.global?.transactions?.length || 0}`,
-    );
-    dispatch(
-      importCsvTransactions({
-        csvData,
-        timestamp: new Date().toISOString(),
-        transactionIds,
-        trackedAddress: address,
-      }),
-    );
-    console.log("Etherscan data stored in document state");
-
-    if (onUploadSuccess) {
-      onUploadSuccess(
-        {
-          transactionCount: validTransactions.length,
-          documentId: document?.header?.id || "unknown",
-          transactions: validTransactions,
-        },
-        {
-          address: address,
-          apiKey: userApiKey,
-          lastBlockNumber,
-        },
-      );
-    }
 
     return { transactions: validTransactions, lastBlockNumber };
   };
@@ -264,7 +143,6 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
         false,
       );
 
-      // Always save the fetch data for potential refresh (even if no transactions found)
       setLastFetchData({
         address: contractAddress.trim(),
         apiKey: apiKey.trim(),
@@ -272,16 +150,20 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
       });
 
       if (result.transactions.length > 0) {
+        onUploadSuccess(
+          result.transactions,
+          contractAddress.trim(),
+          result.lastBlockNumber,
+        );
+
         setUploadResult({
           type: "success",
-          message: `Successfully uploaded ${result.transactions.length} transactions`,
+          message: `Successfully fetched ${result.transactions.length} transactions`,
         });
 
-        // Clear the form after successful upload
         setContractAddress("");
         setApiKey("");
       }
-      // Note: If no transactions found, the fetchTransactions function already sets the appropriate error message
     } catch (error) {
       console.error("Etherscan fetch error:", error);
       setUploadResult({
@@ -309,22 +191,14 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
     setIsRefreshing(true);
     setUploadResult(null);
 
-    // Debug: Log current transaction count before refresh
-    const currentTransactionCount =
-      document?.state?.global?.transactions?.length || 0;
-    console.log(
-      `REFRESH DEBUG: Current transaction count BEFORE refresh: ${currentTransactionCount}`,
-    );
-
     try {
       const result = await fetchTransactions(
         lastFetchData.address,
         lastFetchData.apiKey,
-        lastFetchData.lastBlockNumber + 1, // Start from next block after last fetch
-        true, // This is a refresh
+        lastFetchData.lastBlockNumber + 1,
+        true,
       );
 
-      // Update the last block number
       setLastFetchData({
         ...lastFetchData,
         lastBlockNumber: Math.max(
@@ -333,22 +207,16 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
         ),
       });
 
-      // Debug: Log transaction count after refresh
-      setTimeout(() => {
-        const newTransactionCount =
-          document?.state?.global?.transactions?.length || 0;
-        console.log(
-          `REFRESH DEBUG: Transaction count AFTER refresh: ${newTransactionCount}`,
-        );
-        console.log(
-          `REFRESH DEBUG: Expected count: ${currentTransactionCount + result.transactions.length}`,
-        );
-      }, 100);
-
       if (result.transactions.length > 0) {
+        onUploadSuccess(
+          result.transactions,
+          lastFetchData.address,
+          result.lastBlockNumber,
+        );
+
         setUploadResult({
           type: "success",
-          message: `Successfully uploaded ${result.transactions.length} new transactions`,
+          message: `Successfully fetched ${result.transactions.length} new transactions`,
         });
       }
     } catch (error) {
@@ -614,7 +482,6 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
           <li>Enter your Gnosis Chain address</li>
           <li>We fetch all ERC20 token transactions via Etherscan API V2</li>
           <li>Use the "Refresh" button to fetch only new transactions</li>
-          <li>Data is processed and formatted the same as CSV uploads</li>
         </ul>
       </div>
     </div>
