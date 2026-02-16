@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { FormattedNumber } from "@powerhousedao/design-system/rwa";
 import type { Transaction } from "../../../document-models/crypto-transaction-analytics/gen/types.js";
 import { detectCategory, categoryConfig, type SpendingCategory } from "../utils/categories.js";
+import { SpendingChart } from "./SpendingChart.js";
 
 interface SpendingAnalyticsProps {
   transactions: Transaction[];
@@ -17,7 +18,7 @@ interface CategoryTotal {
 }
 
 export function SpendingAnalytics({ transactions, baseCurrency, currencyCode }: SpendingAnalyticsProps) {
-  const [activeTab, setActiveTab] = useState<"categories" | "merchants" | "trends">("categories");
+  const [activeTab, setActiveTab] = useState<"categories" | "charts" | "trends">("categories");
 
   // Calculate spending by category
   const categoryTotals = React.useMemo((): CategoryTotal[] => {
@@ -109,7 +110,7 @@ export function SpendingAnalytics({ transactions, baseCurrency, currencyCode }: 
 
       {/* Tabs */}
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-        {(["categories", "merchants", "trends"] as const).map((tab) => (
+        {(["categories", "charts", "trends"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -119,7 +120,7 @@ export function SpendingAnalytics({ transactions, baseCurrency, currencyCode }: 
                 : "text-gray-600 hover:text-gray-800"
             }`}
           >
-            {tab === "categories" ? "By Category" : tab === "merchants" ? "By Merchant" : "Trends"}
+            {tab === "categories" ? "Categories" : tab === "charts" ? "Charts" : "Trends"}
           </button>
         ))}
       </div>
@@ -170,10 +171,16 @@ export function SpendingAnalytics({ transactions, baseCurrency, currencyCode }: 
         </div>
       )}
 
-      {activeTab === "merchants" && (
-        <div className="text-center py-12">
-          <div className="text-5xl mb-4">🏪</div>
-          <p className="text-gray-500">Merchant analytics coming soon</p>
+      {activeTab === "charts" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h3 className="font-semibold text-gray-900 mb-4">Spending by Category</h3>
+            <SpendingChart transactions={transactions} baseCurrency={baseCurrency} type="pie" />
+          </div>
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h3 className="font-semibold text-gray-900 mb-4">Monthly Spending</h3>
+            <SpendingChart transactions={transactions} baseCurrency={baseCurrency} type="bar" />
+          </div>
         </div>
       )}
 
