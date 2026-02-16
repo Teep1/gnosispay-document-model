@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { generateId } from "document-model/core";
 import {
-  useSelectedCryptoTransactionAnalyticsDocument,
+  useSelectedGnosispayAnalyticsDocument,
   importCsvTransactions,
-} from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
+} from "gnosis-tx-analytics/document-models/gnosispay-analytics";
 import {
   EtherscanApiService,
   convertEtherscanToParseTransaction,
@@ -26,7 +26,7 @@ interface EtherscanUploaderProps {
 }
 
 export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
-  const [document, dispatch] = useSelectedCryptoTransactionAnalyticsDocument();
+  const [document, dispatch] = useSelectedGnosispayAnalyticsDocument();
   const [contractAddress, setContractAddress] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -196,6 +196,7 @@ export function EtherscanUploader({ onUploadSuccess }: EtherscanUploaderProps) {
         csvData,
         timestamp: new Date().toISOString(),
         transactionIds,
+        trackedAddress: address,
       }),
     );
     console.log("Etherscan data stored in document state");

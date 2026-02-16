@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { generateId } from "document-model/core";
 import {
-  useSelectedCryptoTransactionAnalyticsDocument,
+  useSelectedGnosispayAnalyticsDocument,
   importCsvTransactions,
-} from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
+} from "gnosis-tx-analytics/document-models/gnosispay-analytics";
 
 const CONTRACTS_TO_EXCLUDE = new Set([
   import.meta.env.VITE_EXCLUDED_CONTRACT_ADDRESS?.toLowerCase() ||
@@ -38,7 +38,7 @@ interface CsvUploaderProps {
 }
 
 export function CsvUploader({ onUploadSuccess }: CsvUploaderProps) {
-  const [document, dispatch] = useSelectedCryptoTransactionAnalyticsDocument();
+  const [document, dispatch] = useSelectedGnosispayAnalyticsDocument();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
     type: "success" | "error";
@@ -213,11 +213,37 @@ export function CsvUploader({ onUploadSuccess }: CsvUploaderProps) {
 
       // Dispatch the importCsvTransactions action to store data in document state
       console.log("Dispatching importCsvTransactions action...");
+      // Derive tracked address from parsed transactions
+      const addressCounts = new Map<string, number>();
+      transactions.forEach((tx) => {
+        if (tx.fromAddress) {
+          addressCounts.set(
+            tx.fromAddress.toLowerCase(),
+            (addressCounts.get(tx.fromAddress.toLowerCase()) || 0) + 1,
+          );
+        }
+        if (tx.toAddress) {
+          addressCounts.set(
+            tx.toAddress.toLowerCase(),
+            (addressCounts.get(tx.toAddress.toLowerCase()) || 0) + 1,
+          );
+        }
+      });
+      let trackedAddress = "";
+      let maxCount = 0;
+      addressCounts.forEach((count, addr) => {
+        if (count > maxCount) {
+          maxCount = count;
+          trackedAddress = addr;
+        }
+      });
+
       dispatch(
         importCsvTransactions({
           csvData,
           timestamp: new Date().toISOString(),
           transactionIds,
+          trackedAddress,
         }),
       );
       console.log("CSV data stored in document state");

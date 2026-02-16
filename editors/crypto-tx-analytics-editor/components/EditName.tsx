@@ -1,28 +1,23 @@
 import { setName } from "document-model";
 import type { FormEventHandler, MouseEventHandler } from "react";
 import { useState } from "react";
-import { useSelectedCryptoTransactionAnalyticsDocument } from "gnosis-tx-analytics/document-models/crypto-transaction-analytics";
+import { useSelectedGnosispayAnalyticsDocument } from "gnosis-tx-analytics/document-models/gnosispay-analytics";
 
-/** Displays the name of the selected CryptoTransactionAnalytics document and allows editing it */
-export function EditCryptoTransactionAnalyticsName() {
-  const [cryptoTransactionAnalyticsDocument, dispatch] =
-    useSelectedCryptoTransactionAnalyticsDocument();
+/** Displays the name of the selected GnosispayAnalytics document and allows editing it */
+export function EditGnosispayAnalyticsName() {
+  const [gnosispayAnalyticsDocument, dispatch] =
+    useSelectedGnosispayAnalyticsDocument();
   const [isEditing, setIsEditing] = useState(false);
 
-  if (!cryptoTransactionAnalyticsDocument) return null;
+  if (!gnosispayAnalyticsDocument) return null;
 
-  const cryptoTransactionAnalyticsDocumentName =
-    cryptoTransactionAnalyticsDocument.header.name;
+  const documentName = gnosispayAnalyticsDocument.header.name;
 
-  const onClickEditCryptoTransactionAnalyticsName: MouseEventHandler<
-    HTMLButtonElement
-  > = () => {
+  const onClickEditName: MouseEventHandler<HTMLButtonElement> = () => {
     setIsEditing(true);
   };
 
-  const onClickCancelEditCryptoTransactionAnalyticsName: MouseEventHandler<
-    HTMLButtonElement
-  > = () => {
+  const onClickCancelEditName: MouseEventHandler<HTMLButtonElement> = () => {
     setIsEditing(false);
   };
 
@@ -47,7 +42,7 @@ export function EditCryptoTransactionAnalyticsName() {
           className="text-lg font-semibold text-gray-900 p-1"
           type="text"
           name="name"
-          defaultValue={cryptoTransactionAnalyticsDocumentName}
+          defaultValue={documentName}
           autoFocus
         />
         <div className="flex gap-2">
@@ -56,7 +51,7 @@ export function EditCryptoTransactionAnalyticsName() {
           </button>
           <button
             className="text-sm text-red-800"
-            onClick={onClickCancelEditCryptoTransactionAnalyticsName}
+            onClick={onClickCancelEditName}
           >
             Cancel
           </button>
@@ -66,13 +61,8 @@ export function EditCryptoTransactionAnalyticsName() {
 
   return (
     <div className="flex justify-between items-center">
-      <h2 className="text-lg font-semibold text-gray-900">
-        {cryptoTransactionAnalyticsDocumentName}
-      </h2>
-      <button
-        className="text-sm text-gray-600"
-        onClick={onClickEditCryptoTransactionAnalyticsName}
-      >
+      <h2 className="text-lg font-semibold text-gray-900">{documentName}</h2>
+      <button className="text-sm text-gray-600" onClick={onClickEditName}>
         Edit Name
       </button>
     </div>

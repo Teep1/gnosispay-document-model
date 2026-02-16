@@ -1,1 +1,1 @@
-export { CryptoTransactionAnalytics } from "./crypto-transaction-analytics/module.js";
+export { GnosispayAnalytics } from "./gnosispay-analytics/module.js";
