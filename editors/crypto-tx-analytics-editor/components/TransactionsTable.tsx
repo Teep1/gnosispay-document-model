@@ -1,9 +1,4 @@
 import React from "react";
-import {
-  Table,
-  TableRow,
-  TableCell,
-} from "@powerhousedao/design-system/rwa";
 import { FormattedNumber } from "@powerhousedao/design-system/rwa";
 import type { Transaction } from "../../../document-models/crypto-transaction-analytics/gen/types.js";
 import { detectCategory, getCategoryIcon, getCategoryLabel } from "../utils/categories.js";
@@ -47,7 +42,7 @@ export function TransactionsTable({ transactions, baseCurrency }: TransactionsTa
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <Table className="w-full">
+        <table className="w-full">
           <thead className="bg-gray-50/80 border-b border-gray-200">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
@@ -57,7 +52,7 @@ export function TransactionsTable({ transactions, baseCurrency }: TransactionsTa
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {transactions.map((tx, index) => {
+            {transactions.map((tx) => {
               const isOutgoing = tx.valueOut && tx.valueOut.amount > 0;
               const amount = isOutgoing ? tx.valueOut?.amount : tx.valueIn?.amount;
               const token = isOutgoing ? tx.valueOut?.token : tx.valueIn?.token;
@@ -69,11 +64,11 @@ export function TransactionsTable({ transactions, baseCurrency }: TransactionsTa
                 : "Unknown";
 
               return (
-                <TableRow
+                <tr
                   key={tx.id}
                   className="hover:bg-gray-50/50 transition-colors cursor-pointer group"
                 >
-                  <TableCell className="px-4 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-gray-900">
                         {formatDate(tx.timestamp)}
@@ -82,14 +77,14 @@ export function TransactionsTable({ transactions, baseCurrency }: TransactionsTa
                         {formatTime(tx.timestamp)}
                       </span>
                     </div>
-                  </TableCell>
-                  <TableCell className="px-4 py-4 whitespace-nowrap">
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{categoryIcon}</span>
                       <span className="text-sm text-gray-600">{categoryLabel}</span>
                     </div>
-                  </TableCell>
-                  <TableCell className="px-4 py-4">
+                  </td>
+                  <td className="px-4 py-4">
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
                         {description}
@@ -98,8 +93,8 @@ export function TransactionsTable({ transactions, baseCurrency }: TransactionsTa
                         {tx.txHash.slice(0, 10)}...
                       </span>
                     </div>
-                  </TableCell>
-                  <TableCell className="px-4 py-4 whitespace-nowrap text-right">
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-right">
                     <div className="flex flex-col items-end">
                       <span
                         className={`text-sm font-bold ${
@@ -117,12 +112,12 @@ export function TransactionsTable({ transactions, baseCurrency }: TransactionsTa
                         </span>
                       )}
                     </div>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               );
             })}
           </tbody>
-        </Table>
+        </table>
       </div>
     </div>
   );

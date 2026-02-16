@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
 import { FormattedNumber } from "@powerhousedao/design-system/rwa";
-import { Tabs, Tab } from "@powerhousedao/design-system/rwa";
 import type { Transaction } from "../../../document-models/crypto-transaction-analytics/gen/types.js";
 import { detectCategory, categoryConfig, type SpendingCategory } from "../utils/categories.js";
 
@@ -18,7 +17,7 @@ interface CategoryTotal {
 }
 
 export function SpendingAnalytics({ transactions, baseCurrency, currencyCode }: SpendingAnalyticsProps) {
-  const [activeTab, setActiveTab] = React.useState("categories");
+  const [activeTab, setActiveTab] = useState<"categories" | "merchants" | "trends">("categories");
 
   // Calculate spending by category
   const categoryTotals = React.useMemo((): CategoryTotal[] => {
@@ -109,11 +108,21 @@ export function SpendingAnalytics({ transactions, baseCurrency, currencyCode }: 
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <Tab value="categories" label="By Category" />
-        <Tab value="merchants" label="By Merchant" />
-        <Tab value="trends" label="Trends" />
-      </Tabs>
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+        {(["categories", "merchants", "trends"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === tab
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-800"
+            }`}
+          >
+            {tab === "categories" ? "By Category" : tab === "merchants" ? "By Merchant" : "Trends"}
+          </button>
+        ))}
+      </div>
 
       {/* Category Breakdown */}
       {activeTab === "categories" && (
