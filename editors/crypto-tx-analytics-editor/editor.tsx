@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
+import { FormattedNumber } from "@powerhousedao/design-system/rwa";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
-import { BankingDashboard } from "./components/BankingDashboard.js";
+import { AccountCard as AccountCardV2 } from "./components/AccountCardV2.js";
+import { TransactionsTable } from "./components/TransactionsTable.js";
+import { SpendingAnalytics } from "./components/SpendingAnalytics.js";
+import { BudgetDashboard } from "./components/BudgetDashboard.js";
 import { CsvUploader } from "./components/CsvUploader.js";
 import { EtherscanUploader } from "./components/EtherscanUploader.js";
-import { FinancialAnalytics } from "./components/FinancialAnalytics.js";
-import { DocumentToolbar } from "@powerhousedao/design-system/connect";
 import {
   useSelectedCryptoTransactionAnalyticsDocument,
   importCsvTransactions,
@@ -17,8 +19,9 @@ import {
 } from "./services/etherscanApi.js";
 import { recalculateAnalytics } from "../../document-models/crypto-transaction-analytics/src/utils.js";
 import { detectBaseCurrency } from "../../document-models/crypto-transaction-analytics/src/base-currency-detection.js";
+import type { EtherscanTransaction } from "./services/etherscanApi.js";
 
-type ViewMode = "banking" | "import" | "analytics";
+type ViewMode = "dashboard" | "import";
 
 const TRACKED_ADDRESS =
   import.meta.env.VITE_TRACKED_ETH_ADDRESS?.toLowerCase() ||
@@ -27,7 +30,6 @@ const TRACKED_ADDRESS =
 export default function Editor() {
   return (
     <ErrorBoundary>
-      <DocumentToolbar />
       <EditorContent />
     </ErrorBoundary>
   );
@@ -35,8 +37,8 @@ export default function Editor() {
 
 function EditorContent() {
   const [document, dispatch] = useSelectedCryptoTransactionAnalyticsDocument();
-  const [viewMode, setViewMode] = useState<ViewMode>("banking");
-  const [previewTransactions, setPreviewTransactions] = useState<ParsedTransaction[] | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
+  const [activeTab, setActiveTab] = useState("transactions");
   const [activeUploadTab, setActiveUploadTab] = useState<"csv" | "etherscan">("csv");
 
   const transactions = document?.state?.global?.transactions || [];
@@ -48,55 +50,22 @@ function EditorContent() {
     if (detectedBaseCurrency?.stablecoin) {
       return detectedBaseCurrency.stablecoin;
     }
-    const previewRows = previewTransactions || [];
-    const result = detectBaseCurrency(
-      previewRows.map((r) => ({
-        id: r.transactionHash,
-        txHash: r.transactionHash,
-        blockNumber: "",
-        timestamp: r.timestamp || new Date().toISOString(),
-        fromAddress: r.fromAddress,
-        toAddress: r.toAddress,
-        contractAddress: r.contractAddress,
-        valueIn: r.amountIn ? { amount: r.amountIn, token: r.token, usdValue: null } : null,
-        valueOut: r.amountOut ? { amount: r.amountOut, token: r.token, usdValue: null } : null,
-        txnFee: { amount: r.feeAmount || 0, token: r.feeToken || "XDAI", usdValue: null },
-        historicalPrice: null,
-        currentValue: null,
-        convertedValue: null,
-        status: "SUCCESS" as const,
-        errorCode: null,
-        method: null,
-      }))
-    );
+    const result = detectBaseCurrency(transactions);
     return result.stablecoin || "USDC";
-  }, [detectedBaseCurrency, previewTransactions]);
+  }, [detectedBaseCurrency, transactions]);
 
   const currencyCode = baseCurrency === "GBPe" ? "GBP" : baseCurrency === "EURe" ? "EUR" : "USD";
 
   // Calculate metrics
   const calculatedMetrics = useMemo(() => {
-    const previewRows = previewTransactions || [];
-    const allTransactions = [...transactions];
-    
-    return recalculateAnalytics(
-      allTransactions,
-      baseCurrency,
-      undefined,
-      undefined
-    );
-  }, [transactions, baseCurrency, previewTransactions]);
+    return recalculateAnalytics(transactions, baseCurrency, undefined, undefined);
+  }, [transactions, baseCurrency]);
 
   const currentBalance = calculatedMetrics.totalAdded - calculatedMetrics.totalSpent;
 
   // Persist detected currency
   useEffect(() => {
-    if (
-      baseCurrency &&
-      !detectedBaseCurrency &&
-      dispatch &&
-      transactions.length > 0
-    ) {
+    if (baseCurrency && !detectedBaseCurrency && dispatch && transactions.length > 0) {
       dispatch(calculateAnalytics({ baseCurrency }));
     }
   }, [baseCurrency, detectedBaseCurrency, dispatch, transactions.length]);
@@ -116,7 +85,7 @@ function EditorContent() {
       .join("\n");
 
     const header = "Transaction Hash,DateTime (UTC),Value_IN,Value_OUT,TxnFee,TokenSymbol,From,To,Status\n";
-    
+
     dispatch?.(
       importCsvTransactions({
         csvData: header + csvData,
@@ -125,12 +94,11 @@ function EditorContent() {
       })
     );
 
-    // Calculate analytics after import
     setTimeout(() => {
       dispatch?.(calculateAnalytics({ baseCurrency }));
     }, 100);
 
-    setViewMode("banking");
+    setViewMode("dashboard");
   };
 
   // Handle Etherscan import
@@ -140,12 +108,12 @@ function EditorContent() {
       startBlock: 0,
       endBlock: 99999999,
     });
-    const converted = txs.map((t: import("./services/etherscanApi.js").EtherscanTransaction) =>
+    const converted = txs.map((t: EtherscanTransaction) =>
       convertEtherscanToParseTransaction(t, address)
     );
 
     const csvData = converted
-      .map((t: import("./components/CsvUploader.js").ParsedTransaction) => {
+      .map((t: ParsedTransaction) => {
         const amountIn = t.amountIn ? `${t.amountIn}` : "";
         const amountOut = t.amountOut ? `${t.amountOut}` : "";
         return `${t.transactionHash},${t.rawTimestamp},${amountIn},${amountOut},${t.feeAmount || 0},${t.token},${t.fromAddress},${t.toAddress},1`;
@@ -158,7 +126,7 @@ function EditorContent() {
       importCsvTransactions({
         csvData: header + csvData,
         timestamp: new Date().toISOString(),
-        transactionIds: converted.map((t: import("./components/CsvUploader.js").ParsedTransaction) => t.transactionHash),
+        transactionIds: converted.map((t: ParsedTransaction) => t.transactionHash),
       })
     );
 
@@ -166,140 +134,174 @@ function EditorContent() {
       dispatch?.(calculateAnalytics({ baseCurrency }));
     }, 100);
 
-    setViewMode("banking");
+    setViewMode("dashboard");
   };
 
-  if (viewMode === "banking") {
+  if (viewMode === "import") {
     return (
-      <BankingDashboard
-        transactions={transactions}
-        baseCurrency={baseCurrency}
-        currencyCode={currencyCode}
-        currentBalance={currentBalance}
-        totalAdded={calculatedMetrics.totalAdded}
-        totalSpent={calculatedMetrics.totalSpent}
-        onImportClick={() => setViewMode("import")}
-        onAnalyticsClick={() => setViewMode("analytics")}
-      />
-    );
-  }
-
-  if (viewMode === "analytics") {
-    return (
-      <div className="min-h-screen bg-gray-50 pb-24">
-        <div className="bg-white shadow-sm sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="min-h-screen bg-gray-50 pb-8">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
             <button
-              onClick={() => setViewMode("banking")}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              onClick={() => setViewMode("dashboard")}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Back
             </button>
+            <h1 className="text-lg font-bold text-gray-900">Import Transactions</h1>
+            <div className="w-16" />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <FinancialAnalytics
-            detectedCurrency={baseCurrency}
-            currencyConfidence={detectedBaseCurrency?.confidence || 0}
-            currencyReason={detectedBaseCurrency?.reason || ""}
-            currentBalance={currentBalance}
-            totalAdded={calculatedMetrics.totalAdded}
-            totalSpent={calculatedMetrics.totalSpent}
-            thisMonthSpending={calculatedMetrics.currentMonthExpenses}
-            previousMonthSpending={calculatedMetrics.previousMonthExpenses}
-            availableToSpend={currentBalance}
-            monthlyBudget={null}
-            alertThreshold={80}
-            averageDailySpend={calculatedMetrics.averageDailySpend}
-            averageTransaction={calculatedMetrics.averageTransaction}
-            daysUntilMonthEnd={calculatedMetrics.daysUntilMonthEnd || 0}
-            projectedMonthSpend={calculatedMetrics.projectedMonthSpend}
-            totalFees={calculatedMetrics.totalFees}
-            spendingAlerts={calculatedMetrics.spendingAlerts || []}
-            topTokens={analytics?.transactionsByToken?.slice(0, 5) || []}
-            monthlyBreakdown={analytics?.monthlyBreakdown || []}
-            walletAddress={TRACKED_ADDRESS}
-          />
+
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          {/* Upload Tabs */}
+          <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveUploadTab("csv")}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
+                activeUploadTab === "csv"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              CSV File
+            </button>
+            <button
+              onClick={() => setActiveUploadTab("etherscan")}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
+                activeUploadTab === "etherscan"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Etherscan API
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            {activeUploadTab === "csv" ? (
+              <CsvUploader
+                onUploadSuccess={handleCsvImport}
+              />
+            ) : (
+              <EtherscanUploader
+                onUploadSuccess={(parsed, fetchData) => {
+                  if (fetchData) {
+                    handleEtherscanImport(fetchData.address, fetchData.apiKey);
+                  }
+                }}
+              />
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
-  // Import view
+  // Dashboard View
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <button
-            onClick={() => setViewMode("banking")}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back
-          </button>
+    <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Account Card */}
+      <div className="bg-gradient-to-b from-white to-gray-50 pb-6">
+        <div className="max-w-4xl mx-auto px-4 pt-6">
+          <AccountCardV2
+            balance={currentBalance}
+            baseCurrency={baseCurrency}
+            currencyCode={currencyCode}
+            cardLastFour="••••"
+          />
+
+          {/* Quick Actions */}
+          <div className="flex justify-around mt-6">
+            <QuickActionButton icon="↑" label="Send" color="bg-blue-500" />
+            <QuickActionButton icon="↓" label="Receive" color="bg-emerald-500" />
+            <QuickActionButton
+              icon="📊"
+              label="Analytics"
+              color="bg-purple-500"
+              onClick={() => setActiveTab("analytics")}
+            />
+            <QuickActionButton
+              icon="＋"
+              label="Import"
+              color="bg-gray-600"
+              onClick={() => setViewMode("import")}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Import Transactions</h2>
-
-        {/* Upload Tabs */}
-        <div className="flex gap-4 mb-6">
-          <button
-            onClick={() => setActiveUploadTab("csv")}
-            className={`flex-1 py-3 px-4 rounded-xl font-medium transition-colors ${
-              activeUploadTab === "csv"
-                ? "bg-blue-600 text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            CSV File
-          </button>
-          <button
-            onClick={() => setActiveUploadTab("etherscan")}
-            className={`flex-1 py-3 px-4 rounded-xl font-medium transition-colors ${
-              activeUploadTab === "etherscan"
-                ? "bg-blue-600 text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            Etherscan API
-          </button>
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="flex gap-2 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+          {[
+            { id: "transactions", label: "Transactions" },
+            { id: "analytics", label: "Analytics" },
+            { id: "budget", label: "Budget" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
+                activeTab === tab.id
+                  ? "bg-gray-900 text-white shadow-md"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {activeUploadTab === "csv" ? (
-          <CsvUploader
-            onUploadSuccess={(parsed: {
-              transactionCount: number;
-              documentId: string;
-              transactions: import("./components/CsvUploader.js").ParsedTransaction[];
-            }) => {
-              setPreviewTransactions(parsed.transactions);
-              handleCsvImport(parsed);
-            }}
-          />
-        ) : (
-          <EtherscanUploader
-            onUploadSuccess={(
-              parsed: {
-                transactionCount: number;
-                documentId: string;
-                transactions: import("./components/CsvUploader.js").ParsedTransaction[];
-              },
-              fetchData?: { address: string; apiKey: string; lastBlockNumber: number }
-            ) => {
-              if (fetchData) {
-                handleEtherscanImport(fetchData.address, fetchData.apiKey);
-              }
-            }}
-          />
-        )}
+        <div className="mt-6">
+          {activeTab === "transactions" && (
+            <TransactionsTable transactions={transactions} baseCurrency={baseCurrency} />
+          )}
+
+          {activeTab === "analytics" && (
+            <SpendingAnalytics
+              transactions={transactions}
+              baseCurrency={baseCurrency}
+              currencyCode={currencyCode}
+            />
+          )}
+
+          {activeTab === "budget" && (
+            <BudgetDashboard
+              transactions={transactions}
+              baseCurrency={baseCurrency}
+              currencyCode={currencyCode}
+            />
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+interface QuickActionButtonProps {
+  icon: string;
+  label: string;
+  color: string;
+  onClick?: () => void;
+}
+
+function QuickActionButton({ icon, label, color, onClick }: QuickActionButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center gap-2 group"
+    >
+      <div
+        className={`${color} w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg transform transition-all group-hover:scale-110 group-active:scale-95`}
+      >
+        {icon}
+      </div>
+      <span className="text-xs font-semibold text-gray-700">{label}</span>
+    </button>
   );
 }

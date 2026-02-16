@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { FormattedNumber } from "@powerhousedao/design-system/rwa";
-import { Button } from "@powerhousedao/design-system/ui";
 import { detectCategory, type SpendingCategory, categoryConfig } from "../utils/categories.js";
 import type { Transaction } from "../../../document-models/crypto-transaction-analytics/gen/types.js";
 
@@ -186,9 +185,9 @@ export function BudgetDashboard({ transactions, baseCurrency, currencyCode }: Bu
             })}
           </div>
 
-          <Button className="w-full" variant="secondary">
+          <button className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors">
             + Create New Budget
-          </Button>
+          </button>
         </>
       )}
 
@@ -246,9 +245,9 @@ export function BudgetDashboard({ transactions, baseCurrency, currencyCode }: Bu
             })}
           </div>
 
-          <Button className="w-full" variant="secondary">
+          <button className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors">
             + Create New Goal
-          </Button>
+          </button>
         </>
       )}
     </div>
