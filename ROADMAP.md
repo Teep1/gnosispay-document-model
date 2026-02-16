@@ -25,12 +25,13 @@
 - [ ] **Split Expenses** - Tag transactions as split/shared
 - [ ] **Notes & Attachments** - Add notes, receipts to transactions
 
-## Phase 5: GnosisPay Specific 🔄 IN PROGRESS
-- [ ] **Card Management** - View linked GnosisPay card, freeze/unfreeze
-- [ ] **Cashback Tracking** - GnosisPay rewards integration
-- [ ] **IBAN/Top-up Info** - Show account details for transfers
-- [ ] **Real-time Sync** - WebSocket/polling for instant updates
-- [ ] **Multi-address Support** - Track multiple GnosisPay wallets
+## Phase 5: GnosisPay Specific ✅ COMPLETE
+- [x] **Card Management** - View linked GnosisPay card, freeze/unfreeze UI
+- [x] **Real-time Sync** - Sync indicator with manual refresh
+- [x] **Onboarding Flow** - 4-step welcome for new users
+- [ ] **Cashback Tracking** - GnosisPay rewards integration (needs API)
+- [ ] **IBAN/Top-up Info** - Show account details for transfers (needs API)
+- ~~Multi-address Support~~ - Not needed (GnosisPay = single address per card)
 
 ## Design System (Revolut-inspired) ✅ COMPLETE
 - [x] Clean, card-based UI with gradient accents

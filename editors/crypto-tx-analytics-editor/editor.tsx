@@ -10,6 +10,7 @@ import { ExportModal } from "./components/ExportModal.js";
 import { CardManagement } from "./components/CardManagement.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { RealTimeSync } from "./components/RealTimeSync.js";
+import { DebugPanel } from "./components/DebugPanel.js";
 import { CsvUploader } from "./components/CsvUploader.js";
 import { EtherscanUploader } from "./components/EtherscanUploader.js";
 import {
@@ -113,6 +114,15 @@ function EditorContent() {
     setViewMode("dashboard");
   };
 
+  // Normalize token symbols to GnosisPay format
+  const normalizeToken = (token: string): string => {
+    const upper = token.toUpperCase();
+    if (upper === "GBP" || upper === "GBPE") return "GBPe";
+    if (upper === "EUR" || upper === "EURE") return "EURe";
+    if (upper === "USDC" || upper === "USDCE") return "USDC";
+    return token;
+  };
+
   // Handle Etherscan import
   const handleEtherscanImport = async (address: string, apiKey: string) => {
     const service = new EtherscanApiService(apiKey);
@@ -124,15 +134,18 @@ function EditorContent() {
       convertEtherscanToParseTransaction(t, address)
     );
 
+    // Build CSV with token-specific columns for proper detection
     const csvData = converted
       .map((t: ParsedTransaction) => {
+        const normalizedToken = normalizeToken(t.token);
         const amountIn = t.amountIn ? `${t.amountIn}` : "";
         const amountOut = t.amountOut ? `${t.amountOut}` : "";
-        return `${t.transactionHash},${t.rawTimestamp},${amountIn},${amountOut},${t.feeAmount || 0},${t.token},${t.fromAddress},${t.toAddress},1`;
+        return `${t.transactionHash},${t.rawTimestamp},${amountIn},${normalizedToken},${amountOut},${normalizedToken},${t.feeAmount || 0},XDAI,${t.fromAddress},${t.toAddress},1`;
       })
       .join("\n");
 
-    const header = "Transaction Hash,DateTime (UTC),Value_IN,Value_OUT,TxnFee,TokenSymbol,From,To,Status\n";
+    // Headers with token columns for proper extraction
+    const header = "Transaction Hash,DateTime (UTC),Value_IN,TokenSymbol_IN,Value_OUT,TokenSymbol_OUT,TxnFee,FeeToken,From,To,Status\n";
 
     dispatch?.(
       importCsvTransactions({
@@ -142,8 +155,24 @@ function EditorContent() {
       })
     );
 
+    // Calculate analytics after import with detected base currency
     setTimeout(() => {
-      dispatch?.(calculateAnalytics({ baseCurrency }));
+      const result = detectBaseCurrency(
+        converted.map((t: ParsedTransaction) => ({
+          id: t.transactionHash,
+          txHash: t.transactionHash,
+          blockNumber: "",
+          timestamp: t.rawTimestamp,
+          fromAddress: t.fromAddress,
+          toAddress: t.toAddress,
+          valueIn: t.amountIn ? { amount: t.amountIn, token: normalizeToken(t.token), usdValue: null } : null,
+          valueOut: t.amountOut ? { amount: t.amountOut, token: normalizeToken(t.token), usdValue: null } : null,
+          txnFee: { amount: t.feeAmount || 0, token: "XDAI", usdValue: null },
+          status: "SUCCESS",
+        })) as any
+      );
+      const detectedCurrency = result.stablecoin || "USDC";
+      dispatch?.(calculateAnalytics({ baseCurrency: detectedCurrency }));
     }, 100);
 
     setViewMode("dashboard");
@@ -339,6 +368,9 @@ function EditorContent() {
         transactions={transactions}
         baseCurrency={baseCurrency}
       />
+
+      {/* Debug Panel */}
+      <DebugPanel />
     </div>
   );
 }
