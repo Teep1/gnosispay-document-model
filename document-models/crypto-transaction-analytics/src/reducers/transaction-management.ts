@@ -161,7 +161,15 @@ export const cryptoTransactionAnalyticsTransactionManagementOperations: CryptoTr
           "amount",
         ]);
 
-        const tokenSymbol = getField(txData, [
+        const tokenSymbolIn = getField(txData, [
+          "TokenSymbol_IN",
+          "TokenSymbol",
+          "token",
+          "symbol",
+          "asset",
+        ]);
+        const tokenSymbolOut = getField(txData, [
+          "TokenSymbol_OUT",
           "TokenSymbol",
           "token",
           "symbol",
@@ -186,11 +194,11 @@ export const cryptoTransactionAnalyticsTransactionManagementOperations: CryptoTr
         const errorCode = getField(txData, ["ErrCode", "errorCode", "error"]);
         const method = getField(txData, ["Method", "method", "function"]);
 
-        // Determine token: prefer explicit TokenSymbol, then extracted from header, then contract, then default
+        // Determine token: prefer explicit TokenSymbol_IN/OUT, then extracted from header, then contract, then default
         const valueInToken =
-          tokenSymbol || valueInResult.token || contractAddress || "ETH";
+          tokenSymbolIn || valueInResult.token || contractAddress || "ETH";
         const valueOutToken =
-          tokenSymbol || valueOutResult.token || contractAddress || "ETH";
+          tokenSymbolOut || valueOutResult.token || contractAddress || "ETH";
 
         const transaction = {
           id: action.input.transactionIds[transactionIndex],
