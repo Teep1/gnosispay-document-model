@@ -82,7 +82,7 @@ export type AddTransactionInput = {
 
 export type Analytics = {
   averageTransaction: Maybe<TokenValue>;
-  monthlyBreakdown: Array<TokenValue>;
+  monthlyBreakdown: Array<MonthlyData>;
   spendingByCategory: Array<CategoryValue>;
   totalSpent: Maybe<TokenValue>;
   transactionsByToken: Array<TokenValue>;
@@ -148,6 +148,16 @@ export type ImportTransactionsInput = {
   timestamp: Scalars["DateTime"]["input"];
   trackedAddress: Scalars["String"]["input"];
   transactions: Array<AddTransactionInput>;
+};
+
+export type MonthlyData = {
+  expenses: Scalars["Float"]["output"];
+  income: Scalars["Float"]["output"];
+  month: Scalars["String"]["output"];
+  net: Scalars["Float"]["output"];
+  token: Scalars["String"]["output"];
+  transactionCount: Scalars["Int"]["output"];
+  year: Scalars["Int"]["output"];
 };
 
 export type PriceInfo = {

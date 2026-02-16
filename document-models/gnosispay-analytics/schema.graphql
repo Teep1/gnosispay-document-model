@@ -117,11 +117,21 @@ type Settings {
   exchangeRates: [ExchangeRate!]!
 }
 
+type MonthlyData {
+  month: String!
+  year: Int!
+  income: Float!
+  expenses: Float!
+  net: Float!
+  transactionCount: Int!
+  token: String!
+}
+
 type Analytics {
   totalSpent: TokenValue
   averageTransaction: TokenValue
   transactionsByToken: [TokenValue!]!
-  monthlyBreakdown: [TokenValue!]!
+  monthlyBreakdown: [MonthlyData!]!
   spendingByCategory: [CategoryValue!]!
 }
 

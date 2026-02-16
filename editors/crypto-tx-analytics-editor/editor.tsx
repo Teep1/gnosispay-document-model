@@ -346,6 +346,7 @@ function EditorContent() {
               transactions={transactions}
               baseCurrency={baseCurrency}
               currencyCode={currencyCode}
+              monthlyData={calculatedMetrics.monthlyData}
             />
           )}
 

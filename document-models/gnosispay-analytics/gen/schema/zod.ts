@@ -12,6 +12,7 @@ import type {
   ExchangeRateInput,
   GnosispayAnalyticsState,
   ImportTransactionsInput,
+  MonthlyData,
   PriceInfo,
   PriceInfoInput,
   SetBaseCurrencyInput,
@@ -84,7 +85,7 @@ export function AnalyticsSchema(): z.ZodObject<Properties<Analytics>> {
   return z.object({
     __typename: z.literal("Analytics").optional(),
     averageTransaction: z.lazy(() => TokenValueSchema().nullish()),
-    monthlyBreakdown: z.array(z.lazy(() => TokenValueSchema())),
+    monthlyBreakdown: z.array(z.lazy(() => MonthlyDataSchema())),
     spendingByCategory: z.array(z.lazy(() => CategoryValueSchema())),
     totalSpent: z.lazy(() => TokenValueSchema().nullish()),
     transactionsByToken: z.array(z.lazy(() => TokenValueSchema())),
@@ -189,6 +190,19 @@ export function ImportTransactionsInputSchema(): z.ZodObject<
     timestamp: z.string().datetime(),
     trackedAddress: z.string(),
     transactions: z.array(z.lazy(() => AddTransactionInputSchema())),
+  });
+}
+
+export function MonthlyDataSchema(): z.ZodObject<Properties<MonthlyData>> {
+  return z.object({
+    __typename: z.literal("MonthlyData").optional(),
+    expenses: z.number(),
+    income: z.number(),
+    month: z.string(),
+    net: z.number(),
+    token: z.string(),
+    transactionCount: z.number(),
+    year: z.number(),
   });
 }
 

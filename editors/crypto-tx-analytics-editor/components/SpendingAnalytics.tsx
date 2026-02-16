@@ -7,11 +7,22 @@ import {
   type SpendingCategory,
 } from "../utils/categories.js";
 import { SpendingChart } from "./SpendingChart.js";
+import { MonthlyBreakdown } from "./MonthlyBreakdown.js";
+
+interface MonthlyDataItem {
+  month: string;
+  year: number;
+  income: number;
+  expenses: number;
+  net: number;
+  transactionCount: number;
+}
 
 interface SpendingAnalyticsProps {
   transactions: Transaction[];
   baseCurrency: string;
   currencyCode: string;
+  monthlyData: MonthlyDataItem[];
 }
 
 interface CategoryTotal {
@@ -25,9 +36,10 @@ export function SpendingAnalytics({
   transactions,
   baseCurrency,
   currencyCode,
+  monthlyData,
 }: SpendingAnalyticsProps) {
   const [activeTab, setActiveTab] = useState<
-    "categories" | "charts" | "trends"
+    "categories" | "charts" | "cashflow"
   >("categories");
 
   // Calculate spending by category
@@ -137,7 +149,7 @@ export function SpendingAnalytics({
 
       {/* Tabs */}
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-        {(["categories", "charts", "trends"] as const).map((tab) => (
+        {(["categories", "charts", "cashflow"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -151,7 +163,7 @@ export function SpendingAnalytics({
               ? "Categories"
               : tab === "charts"
                 ? "Charts"
-                : "Trends"}
+                : "Cash Flow"}
           </button>
         ))}
       </div>
@@ -233,11 +245,11 @@ export function SpendingAnalytics({
         </div>
       )}
 
-      {activeTab === "trends" && (
-        <div className="text-center py-12">
-          <div className="text-5xl mb-4">📈</div>
-          <p className="text-gray-500">Spending trends coming soon</p>
-        </div>
+      {activeTab === "cashflow" && (
+        <MonthlyBreakdown
+          monthlyData={monthlyData}
+          currencySymbol={currencySymbol}
+        />
       )}
     </div>
   );

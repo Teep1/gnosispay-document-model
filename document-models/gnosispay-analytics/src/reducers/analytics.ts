@@ -34,35 +34,57 @@ export const gnosispayAnalyticsAnalyticsOperations: GnosispayAnalyticsAnalyticsO
 
       let totalAmount = 0;
       const tokenAmounts: Record<string, number> = {};
-      const monthlyAmounts: Record<string, number> = {};
+      const monthlyData: Record<
+        string,
+        { income: number; expenses: number; count: number }
+      > = {};
 
       transactions.forEach((tx) => {
-        let amount = 0;
+        const monthKey = new Date(tx.timestamp).toISOString().substring(0, 7);
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { income: 0, expenses: 0, count: 0 };
+        }
+        monthlyData[monthKey].count++;
 
-        if (tx.convertedValue) {
-          amount = tx.convertedValue.amount;
-        } else if (
-          tx.valueOut &&
-          tx.valueOut.token === action.input.baseCurrency
-        ) {
-          amount = tx.valueOut.amount;
-        } else if (
-          tx.valueOut &&
-          tx.valueOut.usdValue &&
-          action.input.baseCurrency === "USD"
-        ) {
-          amount = tx.valueOut.usdValue;
+        // Resolve the amount in base currency for outflows (expenses)
+        let expenseAmount = 0;
+        if (tx.valueOut) {
+          if (tx.convertedValue) {
+            expenseAmount = tx.convertedValue.amount;
+          } else if (tx.valueOut.token === action.input.baseCurrency) {
+            expenseAmount = tx.valueOut.amount;
+          } else if (
+            tx.valueOut.usdValue &&
+            action.input.baseCurrency === "USD"
+          ) {
+            expenseAmount = tx.valueOut.usdValue;
+          }
         }
 
-        if (amount > 0) {
-          totalAmount += amount;
+        // Resolve the amount in base currency for inflows (income)
+        let incomeAmount = 0;
+        if (tx.valueIn) {
+          if (tx.valueIn.token === action.input.baseCurrency) {
+            incomeAmount = tx.valueIn.amount;
+          } else if (
+            tx.valueIn.usdValue &&
+            action.input.baseCurrency === "USD"
+          ) {
+            incomeAmount = tx.valueIn.usdValue;
+          }
+        }
+
+        if (expenseAmount > 0) {
+          totalAmount += expenseAmount;
+          monthlyData[monthKey].expenses += expenseAmount;
 
           const originalToken = tx.valueOut?.token || "Unknown";
           tokenAmounts[originalToken] =
             (tokenAmounts[originalToken] || 0) + (tx.valueOut?.amount || 0);
+        }
 
-          const month = new Date(tx.timestamp).toISOString().substring(0, 7);
-          monthlyAmounts[month] = (monthlyAmounts[month] || 0) + amount;
+        if (incomeAmount > 0) {
+          monthlyData[monthKey].income += incomeAmount;
         }
       });
 
@@ -94,11 +116,15 @@ export const gnosispayAnalyticsAnalyticsOperations: GnosispayAnalyticsAnalyticsO
             usdValue: null,
           }),
         ),
-        monthlyBreakdown: Object.entries(monthlyAmounts).map(
-          ([month, amount]) => ({
-            amount,
+        monthlyBreakdown: Object.entries(monthlyData).map(
+          ([monthKey, data]) => ({
+            month: monthKey.substring(5, 7),
+            year: parseInt(monthKey.substring(0, 4), 10),
+            income: data.income,
+            expenses: data.expenses,
+            net: data.income - data.expenses,
+            transactionCount: data.count,
             token: action.input.baseCurrency,
-            usdValue: action.input.baseCurrency === "USD" ? amount : null,
           }),
         ),
         spendingByCategory: [],

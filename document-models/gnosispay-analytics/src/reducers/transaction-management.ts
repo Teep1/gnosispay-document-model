@@ -220,12 +220,8 @@ export const gnosispayAnalyticsTransactionManagementOperations: GnosispayAnalyti
           dateRange:
             timestamps.length > 0
               ? {
-                  startDate: new Date(
-                    Math.min(...timestamps),
-                  ).toISOString(),
-                  endDate: new Date(
-                    Math.max(...timestamps),
-                  ).toISOString(),
+                  startDate: new Date(Math.min(...timestamps)).toISOString(),
+                  endDate: new Date(Math.max(...timestamps)).toISOString(),
                 }
               : state.metadata?.dateRange || null,
           trackedAddress: action.input.trackedAddress,
