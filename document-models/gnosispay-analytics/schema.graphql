@@ -23,7 +23,29 @@ type GnosispayAnalyticsState {
   transactions: [Transaction!]!
   analytics: Analytics
   metadata: TransactionMetadata
+  detectedBaseCurrency: DetectedBaseCurrency
   settings: Settings!
+}
+
+type DetectedBaseCurrency {
+  stablecoin: String!
+  currencyCode: String!
+  confidence: Float!
+  transactionCounts: TransactionCounts!
+  totalVolume: VolumeCounts!
+  reason: String!
+}
+
+type TransactionCounts {
+  USDC: Int!
+  EURe: Int!
+  GBPe: Int!
+}
+
+type VolumeCounts {
+  USDC: Float!
+  EURe: Float!
+  GBPe: Float!
 }
 
 type TokenValue {
@@ -68,6 +90,7 @@ type Transaction {
   fromAddress: String
   toAddress: String
   contractAddress: String
+  category: String
   valueIn: TokenValue
   valueOut: TokenValue
   txnFee: TokenValue!
@@ -99,6 +122,14 @@ type Analytics {
   averageTransaction: TokenValue
   transactionsByToken: [TokenValue!]!
   monthlyBreakdown: [TokenValue!]!
+  spendingByCategory: [CategoryValue!]!
+}
+
+type CategoryValue {
+  category: String!
+  amount: Float!
+  token: String!
+  usdValue: Float
 }
 
 input TokenValueInput {

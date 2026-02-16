@@ -83,12 +83,20 @@ export type AddTransactionInput = {
 export type Analytics = {
   averageTransaction: Maybe<TokenValue>;
   monthlyBreakdown: Array<TokenValue>;
+  spendingByCategory: Array<CategoryValue>;
   totalSpent: Maybe<TokenValue>;
   transactionsByToken: Array<TokenValue>;
 };
 
 export type CalculateAnalyticsInput = {
   baseCurrency: Scalars["Currency"]["input"];
+};
+
+export type CategoryValue = {
+  amount: Scalars["Float"]["output"];
+  category: Scalars["String"]["output"];
+  token: Scalars["String"]["output"];
+  usdValue: Maybe<Scalars["Float"]["output"]>;
 };
 
 export type ConvertTransactionValuesInput = {
@@ -103,6 +111,15 @@ export type DateRange = {
 
 export type DeleteTransactionInput = {
   id: Scalars["OID"]["input"];
+};
+
+export type DetectedBaseCurrency = {
+  confidence: Scalars["Float"]["output"];
+  currencyCode: Scalars["String"]["output"];
+  reason: Scalars["String"]["output"];
+  stablecoin: Scalars["String"]["output"];
+  totalVolume: VolumeCounts;
+  transactionCounts: TransactionCounts;
 };
 
 export type ExchangeRate = {
@@ -121,6 +138,7 @@ export type ExchangeRateInput = {
 
 export type GnosispayAnalyticsState = {
   analytics: Maybe<Analytics>;
+  detectedBaseCurrency: Maybe<DetectedBaseCurrency>;
   metadata: Maybe<TransactionMetadata>;
   settings: Settings;
   transactions: Array<Transaction>;
@@ -167,6 +185,7 @@ export type TokenValueInput = {
 
 export type Transaction = {
   blockNumber: Scalars["String"]["output"];
+  category: Maybe<Scalars["String"]["output"]>;
   contractAddress: Maybe<Scalars["String"]["output"]>;
   convertedValue: Maybe<PriceInfo>;
   currentValue: Maybe<PriceInfo>;
@@ -184,6 +203,12 @@ export type Transaction = {
   txnFee: TokenValue;
   valueIn: Maybe<TokenValue>;
   valueOut: Maybe<TokenValue>;
+};
+
+export type TransactionCounts = {
+  EURe: Scalars["Int"]["output"];
+  GBPe: Scalars["Int"]["output"];
+  USDC: Scalars["Int"]["output"];
 };
 
 export type TransactionMetadata = {
@@ -225,4 +250,10 @@ export type UpdateTransactionInput = {
   txnFee?: InputMaybe<TokenValueInput>;
   valueIn?: InputMaybe<TokenValueInput>;
   valueOut?: InputMaybe<TokenValueInput>;
+};
+
+export type VolumeCounts = {
+  EURe: Scalars["Float"]["output"];
+  GBPe: Scalars["Float"]["output"];
+  USDC: Scalars["Float"]["output"];
 };

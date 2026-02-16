@@ -3,9 +3,11 @@ import type {
   AddTransactionInput,
   Analytics,
   CalculateAnalyticsInput,
+  CategoryValue,
   ConvertTransactionValuesInput,
   DateRange,
   DeleteTransactionInput,
+  DetectedBaseCurrency,
   ExchangeRate,
   ExchangeRateInput,
   GnosispayAnalyticsState,
@@ -17,6 +19,7 @@ import type {
   TokenValue,
   TokenValueInput,
   Transaction,
+  TransactionCounts,
   TransactionMetadata,
   TransactionStatus,
   TransactionStatusInput,
@@ -24,6 +27,7 @@ import type {
   TransactionTypeInput,
   UpdateExchangeRatesInput,
   UpdateTransactionInput,
+  VolumeCounts,
 } from "./types.js";
 
 type Properties<T> = Required<{
@@ -81,6 +85,7 @@ export function AnalyticsSchema(): z.ZodObject<Properties<Analytics>> {
     __typename: z.literal("Analytics").optional(),
     averageTransaction: z.lazy(() => TokenValueSchema().nullish()),
     monthlyBreakdown: z.array(z.lazy(() => TokenValueSchema())),
+    spendingByCategory: z.array(z.lazy(() => CategoryValueSchema())),
     totalSpent: z.lazy(() => TokenValueSchema().nullish()),
     transactionsByToken: z.array(z.lazy(() => TokenValueSchema())),
   });
@@ -91,6 +96,16 @@ export function CalculateAnalyticsInputSchema(): z.ZodObject<
 > {
   return z.object({
     baseCurrency: z.string(),
+  });
+}
+
+export function CategoryValueSchema(): z.ZodObject<Properties<CategoryValue>> {
+  return z.object({
+    __typename: z.literal("CategoryValue").optional(),
+    amount: z.number(),
+    category: z.string(),
+    token: z.string(),
+    usdValue: z.number().nullish(),
   });
 }
 
@@ -116,6 +131,20 @@ export function DeleteTransactionInputSchema(): z.ZodObject<
 > {
   return z.object({
     id: z.string(),
+  });
+}
+
+export function DetectedBaseCurrencySchema(): z.ZodObject<
+  Properties<DetectedBaseCurrency>
+> {
+  return z.object({
+    __typename: z.literal("DetectedBaseCurrency").optional(),
+    confidence: z.number(),
+    currencyCode: z.string(),
+    reason: z.string(),
+    stablecoin: z.string(),
+    totalVolume: z.lazy(() => VolumeCountsSchema()),
+    transactionCounts: z.lazy(() => TransactionCountsSchema()),
   });
 }
 
@@ -146,6 +175,7 @@ export function GnosispayAnalyticsStateSchema(): z.ZodObject<
   return z.object({
     __typename: z.literal("GnosispayAnalyticsState").optional(),
     analytics: z.lazy(() => AnalyticsSchema().nullish()),
+    detectedBaseCurrency: z.lazy(() => DetectedBaseCurrencySchema().nullish()),
     metadata: z.lazy(() => TransactionMetadataSchema().nullish()),
     settings: z.lazy(() => SettingsSchema()),
     transactions: z.array(z.lazy(() => TransactionSchema())),
@@ -220,6 +250,7 @@ export function TransactionSchema(): z.ZodObject<Properties<Transaction>> {
   return z.object({
     __typename: z.literal("Transaction").optional(),
     blockNumber: z.string(),
+    category: z.string().nullish(),
     contractAddress: z.string().nullish(),
     convertedValue: z.lazy(() => PriceInfoSchema().nullish()),
     currentValue: z.lazy(() => PriceInfoSchema().nullish()),
@@ -237,6 +268,17 @@ export function TransactionSchema(): z.ZodObject<Properties<Transaction>> {
     txnFee: z.lazy(() => TokenValueSchema()),
     valueIn: z.lazy(() => TokenValueSchema().nullish()),
     valueOut: z.lazy(() => TokenValueSchema().nullish()),
+  });
+}
+
+export function TransactionCountsSchema(): z.ZodObject<
+  Properties<TransactionCounts>
+> {
+  return z.object({
+    __typename: z.literal("TransactionCounts").optional(),
+    EURe: z.number(),
+    GBPe: z.number(),
+    USDC: z.number(),
   });
 }
 
@@ -283,5 +325,14 @@ export function UpdateTransactionInputSchema(): z.ZodObject<
     txnFee: z.lazy(() => TokenValueInputSchema().nullish()),
     valueIn: z.lazy(() => TokenValueInputSchema().nullish()),
     valueOut: z.lazy(() => TokenValueInputSchema().nullish()),
+  });
+}
+
+export function VolumeCountsSchema(): z.ZodObject<Properties<VolumeCounts>> {
+  return z.object({
+    __typename: z.literal("VolumeCounts").optional(),
+    EURe: z.number(),
+    GBPe: z.number(),
+    USDC: z.number(),
   });
 }

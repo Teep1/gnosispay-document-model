@@ -1,4 +1,21 @@
+import type { Transaction } from "../../gen/schema/types.js";
 import type { GnosispayAnalyticsAnalyticsOperations } from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+
+function normalizeToken(token: string | null | undefined): string {
+  if (!token) return "";
+  const normalized = token.trim().toUpperCase();
+  if (normalized === "USDC" || normalized === "USD") return "USDC";
+  if (normalized === "EUR" || normalized === "EURE") return "EURe";
+  if (normalized === "GBP" || normalized === "GBPE") return "GBPe";
+  return token.trim();
+}
+
+function isGnosisPayStablecoin(token: string | null | undefined): boolean {
+  const normalized = normalizeToken(token);
+  return (
+    normalized === "USDC" || normalized === "EURe" || normalized === "GBPe"
+  );
+}
 
 export const gnosispayAnalyticsAnalyticsOperations: GnosispayAnalyticsAnalyticsOperations =
   {
@@ -10,7 +27,9 @@ export const gnosispayAnalyticsAnalyticsOperations: GnosispayAnalyticsAnalyticsO
           averageTransaction: null,
           transactionsByToken: [],
           monthlyBreakdown: [],
+          spendingByCategory: [],
         };
+        state.detectedBaseCurrency = null;
         return;
       }
 
@@ -83,6 +102,101 @@ export const gnosispayAnalyticsAnalyticsOperations: GnosispayAnalyticsAnalyticsO
             usdValue: action.input.baseCurrency === "USD" ? amount : null,
           }),
         ),
+        spendingByCategory: [],
       };
+
+      // Detect base currency based on transaction patterns
+      const transactionCounts: { USDC: number; EURe: number; GBPe: number } = {
+        USDC: 0,
+        EURe: 0,
+        GBPe: 0,
+      };
+      const totalVolume: { USDC: number; EURe: number; GBPe: number } = {
+        USDC: 0,
+        EURe: 0,
+        GBPe: 0,
+      };
+
+      transactions.forEach((tx) => {
+        if (tx.valueIn?.token && isGnosisPayStablecoin(tx.valueIn.token)) {
+          const normalized = normalizeToken(tx.valueIn.token);
+          if (isGnosisPayStablecoin(normalized)) {
+            const key = normalized as "USDC" | "EURe" | "GBPe";
+            transactionCounts[key]++;
+            totalVolume[key] += tx.valueIn.amount || 0;
+          }
+        }
+        if (tx.valueOut?.token && isGnosisPayStablecoin(tx.valueOut.token)) {
+          const normalized = normalizeToken(tx.valueOut.token);
+          if (isGnosisPayStablecoin(normalized)) {
+            const key = normalized as "USDC" | "EURe" | "GBPe";
+            transactionCounts[key]++;
+            totalVolume[key] += tx.valueOut.amount || 0;
+          }
+        }
+        if (tx.txnFee?.token && isGnosisPayStablecoin(tx.txnFee.token)) {
+          const normalized = normalizeToken(tx.txnFee.token);
+          if (isGnosisPayStablecoin(normalized)) {
+            const key = normalized as "USDC" | "EURe" | "GBPe";
+            transactionCounts[key]++;
+            totalVolume[key] += tx.txnFee.amount || 0;
+          }
+        }
+      });
+
+      type StablecoinKey = "USDC" | "EURe" | "GBPe";
+      const entries = Object.entries(transactionCounts) as [
+        StablecoinKey,
+        number,
+      ][];
+      const sortedByCount = entries.sort((a, b) => b[1] - a[1]);
+      const [topByCount, topCount] = sortedByCount[0];
+      const secondByCount = sortedByCount[1]?.[1] || 0;
+      const totalStablecoinTxs = entries.reduce(
+        (sum, [, count]) => sum + count,
+        0,
+      );
+
+      if (totalStablecoinTxs > 0) {
+        const currencyCodes: Record<StablecoinKey, string> = {
+          USDC: "USD",
+          EURe: "EUR",
+          GBPe: "GBP",
+        };
+        let detectedStablecoin: StablecoinKey = topByCount;
+        let reason = `Selected ${topByCount} based on ${topCount} transactions (${Math.round((topCount / totalStablecoinTxs) * 100)}% of stablecoin activity)`;
+
+        if (topCount === secondByCount && secondByCount > 0) {
+          const volumeEntries = Object.entries(totalVolume) as [
+            StablecoinKey,
+            number,
+          ][];
+          const sortedByVolume = volumeEntries.sort((a, b) => b[1] - a[1]);
+          if (sortedByVolume[0][0] !== topByCount) {
+            detectedStablecoin = sortedByVolume[0][0];
+            reason = `Selected based on higher volume (${sortedByVolume[0][1].toFixed(2)} vs ${totalVolume[topByCount].toFixed(2)}) due to transaction count tie`;
+          } else {
+            reason = `Selected ${topByCount} based on transaction count (${topCount} transactions, tie broken by volume)`;
+          }
+        }
+
+        const countGap = topCount - secondByCount;
+        const confidenceFromCount = Math.min(
+          countGap / Math.max(topCount, 1),
+          1,
+        );
+        const confidence = 0.6 * confidenceFromCount + 0.4;
+
+        state.detectedBaseCurrency = {
+          stablecoin: detectedStablecoin,
+          currencyCode: currencyCodes[detectedStablecoin],
+          confidence,
+          transactionCounts,
+          totalVolume,
+          reason,
+        };
+      } else {
+        state.detectedBaseCurrency = null;
+      }
     },
   };

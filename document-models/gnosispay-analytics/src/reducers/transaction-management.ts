@@ -161,7 +161,15 @@ export const gnosispayAnalyticsTransactionManagementOperations: GnosispayAnalyti
           "amount",
         ]);
 
-        const tokenSymbol = getField(txData, [
+        const tokenSymbolIn = getField(txData, [
+          "TokenSymbol_IN",
+          "TokenSymbol",
+          "token",
+          "symbol",
+          "asset",
+        ]);
+        const tokenSymbolOut = getField(txData, [
+          "TokenSymbol_OUT",
           "TokenSymbol",
           "token",
           "symbol",
@@ -186,11 +194,11 @@ export const gnosispayAnalyticsTransactionManagementOperations: GnosispayAnalyti
         const errorCode = getField(txData, ["ErrCode", "errorCode", "error"]);
         const method = getField(txData, ["Method", "method", "function"]);
 
-        // Determine token: prefer explicit TokenSymbol, then extracted from header, then contract, then default
+        // Determine token: prefer explicit TokenSymbol_IN/OUT, then extracted from header, then contract, then default
         const valueInToken =
-          tokenSymbol || valueInResult.token || contractAddress || "ETH";
+          tokenSymbolIn || valueInResult.token || contractAddress || "ETH";
         const valueOutToken =
-          tokenSymbol || valueOutResult.token || contractAddress || "ETH";
+          tokenSymbolOut || valueOutResult.token || contractAddress || "ETH";
 
         // Compute transaction type and signed amount based on tracked address
         const trackedAddressLower = action.input.trackedAddress.toLowerCase();
@@ -227,6 +235,7 @@ export const gnosispayAnalyticsTransactionManagementOperations: GnosispayAnalyti
           fromAddress: fromAddress || null,
           toAddress: toAddress || null,
           contractAddress: contractAddress || null,
+          category: null as string | null,
           valueIn:
             valueInResult.value && parseFloat(valueInResult.value) > 0
               ? {
@@ -335,6 +344,7 @@ export const gnosispayAnalyticsTransactionManagementOperations: GnosispayAnalyti
         fromAddress: action.input.fromAddress || null,
         toAddress: action.input.toAddress || null,
         contractAddress: action.input.contractAddress || null,
+        category: null as string | null,
         valueIn: action.input.valueIn
           ? {
               amount: action.input.valueIn.amount,
