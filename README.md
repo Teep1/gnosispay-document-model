@@ -35,13 +35,6 @@ cp .env.example .env
 # VITE_TRACKED_ETH_ADDRESS=your_wallet_address
 ```
 
-### Test Address
-
-For testing purposes, you can use this GnosisPay test address:
-```
-[REDACTED]
-```
-
 ### Development
 
 ```bash
