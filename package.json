@@ -1,7 +1,7 @@
 {
   "name": "@gnosispay-ph/analytics",
   "description": "Gnosis Pay Transaction Analytics - Track and analyze blockchain transactions with multi-token support",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "AGPL-3.0-only",
   "type": "module",
   "files": [
@@ -113,6 +113,5 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
-  "readme": "ERROR: No README data found!",
-  "_id": "gnosis-tx-analytics@1.0.0"
+  "readme": "ERROR: No README data found!"
 }
