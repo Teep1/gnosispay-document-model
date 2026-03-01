@@ -39,8 +39,8 @@ export function SpendingAnalytics({
   monthlyData,
 }: SpendingAnalyticsProps) {
   const [activeTab, setActiveTab] = useState<
-    "categories" | "charts" | "cashflow"
-  >("categories");
+    "cashflow" | "categories" | "charts"
+  >("cashflow");
 
   // Calculate spending by category
   const categoryTotals = React.useMemo((): CategoryTotal[] => {
@@ -149,7 +149,7 @@ export function SpendingAnalytics({
 
       {/* Tabs */}
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-        {(["categories", "charts", "cashflow"] as const).map((tab) => (
+        {(["cashflow", "categories", "charts"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}

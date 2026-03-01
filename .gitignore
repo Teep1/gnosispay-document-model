@@ -6,4 +6,5 @@ node_modules
 .env
 
 .ph
+.keypair.json
 projects-import.js

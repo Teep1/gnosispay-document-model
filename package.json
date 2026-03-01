@@ -1,5 +1,5 @@
 {
-  "name": "gnosis-tx-analytics",
+  "name": "@gnosispay-ph/gnosis-tx-analytics",
   "description": "Gnosis Pay Transaction Analytics - Track and analyze blockchain transactions with multi-token support",
   "version": "1.0.0",
   "license": "AGPL-3.0-only",

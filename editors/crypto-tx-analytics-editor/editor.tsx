@@ -4,10 +4,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { AccountCard as AccountCardV2 } from "./components/AccountCardV2.js";
 import { TransactionsTable } from "./components/TransactionsTable.js";
 import { SpendingAnalytics } from "./components/SpendingAnalytics.js";
-import { BudgetDashboard } from "./components/BudgetDashboard.js";
 import { TransactionFilters } from "./components/TransactionFilters.js";
 import { ExportModal } from "./components/ExportModal.js";
-import { CardManagement } from "./components/CardManagement.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { RealTimeSync } from "./components/RealTimeSync.js";
 import { DebugPanel } from "./components/DebugPanel.js";
@@ -285,8 +283,6 @@ function EditorContent() {
           {[
             { id: "transactions", label: "Transactions" },
             { id: "analytics", label: "Analytics" },
-            { id: "budget", label: "Budget" },
-            { id: "cards", label: "Cards" },
             { id: "settings", label: "Settings" },
           ].map((tab) => (
             <button
@@ -349,16 +345,6 @@ function EditorContent() {
               monthlyData={calculatedMetrics.monthlyData}
             />
           )}
-
-          {activeTab === "budget" && (
-            <BudgetDashboard
-              transactions={transactions}
-              baseCurrency={baseCurrency}
-              currencyCode={currencyCode}
-            />
-          )}
-
-          {activeTab === "cards" && <CardManagement />}
 
           {activeTab === "settings" && (
             <SettingsPanel
