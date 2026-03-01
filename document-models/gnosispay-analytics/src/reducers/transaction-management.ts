@@ -1,6 +1,6 @@
 import type { TransactionStatus } from "../../gen/schema/types.js";
 import { EmptyTransactionsError } from "../../gen/transaction-management/error.js";
-import type { GnosispayAnalyticsTransactionManagementOperations } from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+import type { GnosispayAnalyticsTransactionManagementOperations } from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 
 export const gnosispayAnalyticsTransactionManagementOperations: GnosispayAnalyticsTransactionManagementOperations =
   {

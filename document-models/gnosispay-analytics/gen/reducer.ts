@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import type { StateReducer } from "document-model";
 import { isDocumentAction, createReducer } from "document-model/core";
-import type { GnosispayAnalyticsPHState } from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+import type { GnosispayAnalyticsPHState } from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 
 import { gnosispayAnalyticsTransactionManagementOperations } from "../src/reducers/transaction-management.js";
 import { gnosispayAnalyticsCurrencyManagementOperations } from "../src/reducers/currency-management.js";

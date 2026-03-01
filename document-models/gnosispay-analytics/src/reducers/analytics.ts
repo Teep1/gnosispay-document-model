@@ -1,4 +1,4 @@
-import type { GnosispayAnalyticsAnalyticsOperations } from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+import type { GnosispayAnalyticsAnalyticsOperations } from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 
 function normalizeToken(token: string | null | undefined): string {
   if (!token) return "";

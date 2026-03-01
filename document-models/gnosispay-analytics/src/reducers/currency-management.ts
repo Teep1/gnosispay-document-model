@@ -1,4 +1,4 @@
-import type { GnosispayAnalyticsCurrencyManagementOperations } from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+import type { GnosispayAnalyticsCurrencyManagementOperations } from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 
 export const gnosispayAnalyticsCurrencyManagementOperations: GnosispayAnalyticsCurrencyManagementOperations =
   {

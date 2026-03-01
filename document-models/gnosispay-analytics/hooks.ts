@@ -8,7 +8,7 @@ import {
 import type {
   GnosispayAnalyticsAction,
   GnosispayAnalyticsDocument,
-} from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+} from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 import {
   assertIsGnosispayAnalyticsDocument,
   isGnosispayAnalyticsDocument,

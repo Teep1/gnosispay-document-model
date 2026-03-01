@@ -17,7 +17,7 @@ import {
   assertIsGnosispayAnalyticsDocument,
   isGnosispayAnalyticsState,
   assertIsGnosispayAnalyticsState,
-} from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+} from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 import { ZodError } from "zod";
 
 describe("GnosispayAnalytics Document Model", () => {

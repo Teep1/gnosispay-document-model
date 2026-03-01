@@ -3,7 +3,7 @@ import {
   reducer,
   utils,
   importTransactions,
-} from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+} from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 import { convertEtherscanToParseTransaction } from "../../../editors/crypto-tx-analytics-editor/services/etherscanApi.js";
 import type { EtherscanTransaction } from "../../../editors/crypto-tx-analytics-editor/services/etherscanApi.js";
 import type { AddTransactionInput } from "../gen/schema/types.js";

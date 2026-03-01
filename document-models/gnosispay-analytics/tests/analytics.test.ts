@@ -6,7 +6,7 @@ import {
   isGnosispayAnalyticsDocument,
   calculateAnalytics,
   CalculateAnalyticsInputSchema,
-} from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+} from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 
 describe("AnalyticsOperations", () => {
   it("should handle calculateAnalytics operation", () => {

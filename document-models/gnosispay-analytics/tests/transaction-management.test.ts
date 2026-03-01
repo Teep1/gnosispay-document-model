@@ -11,7 +11,7 @@ import {
   UpdateTransactionInputSchema,
   DeleteTransactionInputSchema,
   importTransactions,
-} from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+} from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 
 describe("TransactionManagementOperations", () => {
   it("should handle addTransaction operation", () => {

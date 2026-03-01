@@ -1,7 +1,7 @@
 import { setName } from "document-model";
 import type { FormEventHandler, MouseEventHandler } from "react";
 import { useState } from "react";
-import { useSelectedGnosispayAnalyticsDocument } from "gnosis-tx-analytics/document-models/gnosispay-analytics";
+import { useSelectedGnosispayAnalyticsDocument } from "@gnosispay-ph/analytics/document-models/gnosispay-analytics";
 
 /** Displays the name of the selected GnosispayAnalytics document and allows editing it */
 export function EditGnosispayAnalyticsName() {
